@@ -39,7 +39,8 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: '/backtest',
-    redirect: '/strategy/list',
+    name: 'BacktestHome',
+    component: () => import('../pages/BacktestHome.vue'),
   },
   {
     path: '/backtest/:strategyId',

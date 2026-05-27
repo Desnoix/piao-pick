@@ -346,8 +346,12 @@ async function load() {
     if (!rawMode.value) {
       parseYamlConfig(strategy.value.config || '')
     }
-  } catch {
-    message.error('加载失败')
+  } catch (e: any) {
+    const detail = e?.response?.data?.detail || '加载失败'
+    message.error(detail)
+    if (e?.response?.status === 404) {
+      router.push('/strategy/list')
+    }
   } finally {
     loading.value = false
   }
@@ -433,7 +437,7 @@ watch(
     <div class="max-w-[1200px] flex flex-col gap-4">
       <!-- Breadcrumb -->
       <div class="flex items-center gap-2 text-sm">
-        <router-link to="/strategy/list" class="text-[var(--color-accent)] hover:underline">策略</router-link>
+        <router-link to="/strategy/list" class="text-[var(--color-accent)] hover:underline text-sm">策略</router-link>
         <span class="text-[var(--color-text-muted)]">/</span>
         <span class="text-[var(--color-text-secondary)]">{{ isNew ? '新建策略' : displayName || '编辑' }}</span>
       </div>
@@ -585,6 +589,9 @@ watch(
               </div>
             </template>
             <div class="glass-panel p-4 flex flex-col gap-2">
+              <div v-if="factors.length === 0" class="text-center py-8 text-sm text-[var(--color-text-muted)]">
+                暂无可用因子
+              </div>
               <div
                 v-for="factor in factors"
                 :key="factor.id"

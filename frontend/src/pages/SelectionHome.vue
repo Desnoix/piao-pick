@@ -32,6 +32,7 @@ const selectedStrategy = ref<string | null>(null)
 const selectedStock = ref<SelectionRecord | null>(null)
 const running = ref(false)
 const searchText = ref('')
+const fetchError = ref<string | null>(null)
 
 const filteredResults = computed(() => {
   if (!searchText.value) return selectionStore.results
@@ -48,6 +49,14 @@ const strategyOptions = computed(() =>
       label: s.display_name || s.name || s.id,
       value: s.id,
     }))
+)
+
+const hasStrategies = computed(
+  () => strategyStore.strategies.length > 0
+)
+
+const currentStrategy = computed(() =>
+  strategyStore.strategies.find((s) => s.id === selectedStrategy.value)
 )
 
 const columns: DataTableColumns<SelectionRecord> = [
@@ -81,6 +90,19 @@ const columns: DataTableColumns<SelectionRecord> = [
           },
         },
         row.ts_code
+      )
+    },
+  },
+  {
+    title: '名称',
+    key: 'name',
+    width: 100,
+    render(row) {
+      const rec = row as any
+      return h(
+        'span',
+        { class: 'text-sm text-[var(--color-text-secondary)]' },
+        rec.name || '-'
       )
     },
   },
@@ -172,7 +194,13 @@ function rowClassName(row: SelectionRecord) {
 }
 
 onMounted(async () => {
-  await strategyStore.fetchStrategies()
+  fetchError.value = null
+  try {
+    await strategyStore.fetchStrategies()
+  } catch (e: any) {
+    fetchError.value = e?.response?.data?.detail || e?.message || '无法连接后端, 请检查网络'
+    return
+  }
   if (strategyStore.strategies.length > 0) {
     selectedStrategy.value = strategyStore.strategies[0].id
     await selectionStore.fetchResults(selectedStrategy.value)
@@ -184,135 +212,210 @@ watch(selectedStrategy, async (val) => {
     await selectionStore.fetchResults(val)
   }
 })
+
+async function onRetry() {
+  fetchError.value = null
+  try {
+    await strategyStore.fetchStrategies()
+  } catch (e: any) {
+    fetchError.value = e?.response?.data?.detail || e?.message || '无法连接后端, 请检查网络'
+    return
+  }
+  if (strategyStore.strategies.length > 0) {
+    selectedStrategy.value = strategyStore.strategies[0].id
+    await selectionStore.fetchResults(selectedStrategy.value)
+  }
+}
 </script>
 
 <template>
   <div class="flex flex-col gap-5">
-    <!-- Top action bar -->
-    <div class="flex items-center gap-3 flex-wrap">
-      <!-- Strategy selector + run button -->
-      <div class="flex items-center gap-2">
-        <NSelect
-          v-model:value="selectedStrategy"
-          :options="strategyOptions"
-          placeholder="选择策略"
-          class="w-56"
-        />
-        <NButton
-          type="primary"
-          :loading="running"
-          @click="handleRun"
-        >
-          <template #icon>
-            <PhPlay :size="16" weight="fill" />
-          </template>
-          运行选股
-        </NButton>
-      </div>
-
-      <!-- Spacer -->
-      <div class="flex-1" />
-
-      <!-- Search -->
-      <NInput
-        v-model:value="searchText"
-        placeholder="搜索股票代码..."
-        clearable
+    <!-- Connection error banner -->
+    <div
+      v-if="fetchError"
+      class="glass-panel p-5 border border-[var(--color-error,#ef4444)] text-center"
+    >
+      <p class="text-sm text-[var(--color-error,#ef4444)] mb-3">
+        {{ fetchError }}
+      </p>
+      <NButton
         size="small"
-        class="w-52"
+        @click="onRetry"
       >
-        <template #prefix>
-          <PhMagnifyingGlass
-            :size="14"
-            class="text-[var(--color-text-muted)]"
-          />
-        </template>
-      </NInput>
-
-      <!-- Stats -->
-      <div class="flex items-center gap-3 text-sm text-[var(--color-text-secondary)]">
-        <span>{{ today }}</span>
-        <span
-          v-if="searchText && filteredResults.length !== selectionStore.results.length"
-          class="data-mono font-medium"
-        >
-          {{ filteredResults.length }} / {{ selectionStore.results.length }} 只
-        </span>
-        <span v-else class="data-mono font-medium">
-          {{ filteredResults.length }} 只
-        </span>
-      </div>
+        重新加载
+      </NButton>
     </div>
 
-    <!-- Main content area -->
-    <div class="flex gap-5 min-h-[600px]">
-      <!-- Table -->
-      <div class="flex-1 min-w-0">
-        <div class="glass-panel overflow-hidden">
-          <NDataTable
-            :columns="columns"
-            :data="filteredResults"
-            :loading="selectionStore.loading"
-            :virtual-scroll="true"
-            :max-height="580"
-            :row-key="(row: SelectionRecord) => row.ts_code"
-            :row-class-name="rowClassName"
-            @row-click="handleRowClick"
-            size="small"
-            striped
+    <!-- Strategy empty state -->
+    <div
+      v-else-if="!hasStrategies && !strategyStore.loading"
+      class="glass-panel p-8 text-center"
+    >
+      <p class="text-sm text-[var(--color-text-secondary)] mb-3">
+        暂无活跃策略, 请先创建策略
+      </p>
+      <NButton
+        size="small"
+        @click="router.push('/strategy/list')"
+      >
+        前往策略管理
+      </NButton>
+    </div>
+
+    <!-- Main content -->
+    <template v-else>
+      <!-- Top action bar -->
+      <div class="flex items-center gap-3 flex-wrap">
+        <!-- Strategy selector + run button -->
+        <div class="flex items-center gap-2">
+          <NSelect
+            v-model:value="selectedStrategy"
+            :options="strategyOptions"
+            placeholder="选择策略"
+            class="w-56"
           />
+          <NButton
+            type="primary"
+            :loading="running"
+            @click="handleRun"
+          >
+            <template #icon>
+              <PhPlay :size="16" weight="fill" />
+            </template>
+            运行选股
+          </NButton>
+        </div>
+
+        <!-- Spacer -->
+        <div class="flex-1" />
+
+        <!-- Search -->
+        <NInput
+          v-model:value="searchText"
+          placeholder="搜索股票代码..."
+          clearable
+          size="small"
+          class="w-52"
+        >
+          <template #prefix>
+            <PhMagnifyingGlass
+              :size="14"
+              class="text-[var(--color-text-muted)]"
+            />
+          </template>
+        </NInput>
+
+        <!-- Stats -->
+        <div class="flex items-center gap-3 text-sm text-[var(--color-text-secondary)]">
+          <span>{{ today }}</span>
+          <span
+            v-if="searchText && filteredResults.length !== selectionStore.results.length"
+            class="data-mono font-medium"
+          >
+            {{ filteredResults.length }} / {{ selectionStore.results.length }} 只
+          </span>
+          <span v-else class="data-mono font-medium">
+            {{ filteredResults.length }} 只
+          </span>
         </div>
       </div>
 
-      <!-- Right panel -->
-      <div class="w-[400px] shrink-0">
-        <div class="glass-panel h-full overflow-y-auto">
-          <div class="p-5">
+      <!-- Loading indicator -->
+      <div
+        v-if="selectionStore.loading && selectionStore.results.length === 0"
+        class="text-xs text-[var(--color-text-muted)] text-center py-2"
+      >
+        正在加载选股结果...
+      </div>
+
+      <!-- Main content area -->
+      <div class="flex gap-5 min-h-[600px]">
+        <!-- Table -->
+        <div class="flex-1 min-w-0">
+          <div class="glass-panel overflow-hidden">
+            <NDataTable
+              :columns="columns"
+              :data="filteredResults"
+              :loading="selectionStore.loading"
+              :virtual-scroll="true"
+              :max-height="580"
+              :row-key="(row: SelectionRecord) => row.ts_code"
+              :row-class-name="rowClassName"
+              @row-click="handleRowClick"
+              size="small"
+              striped
+            />
+          </div>
+        </div>
+
+        <!-- Right panel -->
+        <div class="w-[400px] shrink-0">
+          <div class="glass-panel h-full overflow-y-auto">
             <!-- Selected stock detail -->
             <template v-if="selectedStock">
-              <div class="flex items-baseline gap-2 mb-1">
-                <span class="text-lg font-bold data-mono text-[var(--color-text-primary)]">
-                  {{ selectedStock.ts_code }}
-                </span>
-                <NTag size="small" :bordered="false" type="info">
-                  #{{ selectedStock.rank }}
-                </NTag>
+              <div class="p-5 border-b border-[var(--color-border)]">
+                <div class="flex items-baseline gap-2 mb-1">
+                  <span class="text-lg font-bold data-mono text-[var(--color-text-primary)]">
+                    {{ selectedStock.ts_code }}
+                  </span>
+                  <NTag size="small" :bordered="false" type="info">
+                    #{{ selectedStock.rank }}
+                  </NTag>
+                </div>
+                <div class="flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">
+                  <span>评分</span>
+                  <span class="data-mono font-semibold text-[var(--color-text-primary)]">
+                    {{ selectedStock.composite_score.toFixed(2) }}
+                  </span>
+                  <span class="text-[var(--color-text-muted)]">|</span>
+                  <span>{{ selectedStock.trade_date }}</span>
+                </div>
               </div>
-              <div class="flex items-center gap-2 text-sm text-[var(--color-text-secondary)] mb-5">
-                <span>评分</span>
-                <span class="data-mono font-semibold text-[var(--color-text-primary)]">
-                  {{ selectedStock.composite_score.toFixed(2) }}
-                </span>
-                <span class="text-[var(--color-text-muted)]">|</span>
-                <span>{{ selectedStock.trade_date }}</span>
+              <div class="p-5">
+                <!-- Factor radar -->
+                <FactorRadar
+                  v-if="
+                    selectedStock.factor_snapshot &&
+                    Object.keys(selectedStock.factor_snapshot).length
+                  "
+                  :factors="selectedStock.factor_snapshot"
+                  :theme="theme"
+                />
+
+                <NButton
+                  type="primary"
+                  ghost
+                  class="mt-5 w-full"
+                  @click="router.push(`/stock/${selectedStock.ts_code}`)"
+                >
+                  查看详情
+                </NButton>
               </div>
-
-              <!-- Factor radar -->
-              <FactorRadar
-                v-if="
-                  selectedStock.factor_snapshot &&
-                  Object.keys(selectedStock.factor_snapshot).length
-                "
-                :factors="selectedStock.factor_snapshot"
-                :theme="theme"
-              />
-
-              <NButton
-                type="primary"
-                ghost
-                class="mt-5 w-full"
-                @click="router.push(`/stock/${selectedStock.ts_code}`)"
-              >
-                查看详情
-              </NButton>
             </template>
 
-            <!-- Empty state -->
+            <!-- Empty state with strategy info -->
             <template v-else>
+              <div
+                v-if="currentStrategy"
+                class="p-5 border-b border-[var(--color-border)]"
+              >
+                <div class="text-xs text-[var(--color-text-muted)] mb-1">
+                  当前策略
+                </div>
+                <div class="text-sm font-medium text-[var(--color-text-primary)]">
+                  {{ currentStrategy.display_name || currentStrategy.name }}
+                </div>
+                <div class="flex items-center gap-3 mt-2 text-xs text-[var(--color-text-muted)]">
+                  <span>{{ currentStrategy.category }}</span>
+                  <span v-if="currentStrategy.is_active" class="text-[var(--color-success,#22c55e)]">
+                    活跃
+                  </span>
+                </div>
+              </div>
               <div class="flex flex-col items-center justify-center h-full text-center py-20">
                 <PhCursorClick
-                  :size="40"
-                  class="text-[var(--color-text-muted)] opacity-40 mb-4"
+                  :size="48"
+                  class="text-[var(--color-text-muted)] opacity-30 mb-4"
                 />
                 <p class="text-sm text-[var(--color-text-secondary)] opacity-50">
                   点击行查看因子画像
@@ -322,7 +425,7 @@ watch(selectedStrategy, async (val) => {
           </div>
         </div>
       </div>
-    </div>
+    </template>
   </div>
 </template>
 

@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { h, ref, onMounted, computed } from 'vue'
-import { NDataTable, NButton, NSpace, NTag, NSwitch, useMessage, useDialog } from 'naive-ui'
+import { NDataTable, NButton, NSpace, NTag, NSwitch, NAlert, useMessage, useDialog } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
 import { useRouter } from 'vue-router'
+import { PhPlus, PhSlidersHorizontal } from '@phosphor-icons/vue'
 import { useStrategyStore } from '../stores/strategy'
 import { updateStrategy } from '../api/strategies'
 import type { Strategy } from '../types/strategy'
@@ -13,6 +14,7 @@ const message = useMessage()
 const dialog = useDialog()
 
 const selectedIds = ref<string[]>([])
+const fetchError = ref<string | null>(null)
 
 const compareDisabled = computed(() => {
   return selectedIds.value.length < 2 || selectedIds.value.length > 4
@@ -137,8 +139,12 @@ const columns: DataTableColumns<Strategy> = [
   },
 ]
 
-onMounted(() => {
-  strategyStore.fetchStrategies()
+onMounted(async () => {
+  try {
+    await strategyStore.fetchStrategies()
+  } catch (e: any) {
+    fetchError.value = e?.response?.data?.detail || e?.message || '加载策略失败'
+  }
 })
 </script>
 
@@ -158,10 +164,19 @@ onMounted(() => {
           对比 ({{ selectedIds.length }})
         </NButton>
         <NButton type="primary" @click="router.push('/strategy/new')">
+          <template #icon><PhPlus :size="16" /></template>
           新建策略
         </NButton>
       </NSpace>
     </div>
+    <NAlert v-if="fetchError" type="error" closable @close="fetchError = null">
+      <div class="flex items-center justify-between">
+        <span>{{ fetchError }}</span>
+        <NButton size="small" @click="() => { fetchError = null; strategyStore.fetchStrategies().catch((e: any) => { fetchError = e?.response?.data?.detail || e?.message || '加载策略失败' }) }">
+          重试
+        </NButton>
+      </div>
+    </NAlert>
     <div class="glass-panel overflow-hidden">
       <NDataTable
         :columns="columns"
@@ -173,5 +188,16 @@ onMounted(() => {
         striped
       />
     </div>
+    <template v-if="strategyStore.strategies.length === 0 && !strategyStore.loading && !fetchError">
+      <div class="glass-panel p-12 text-center mt-4">
+        <PhSlidersHorizontal :size="48" class="text-[var(--color-text-muted)] opacity-40 mx-auto mb-4" />
+        <p class="text-base text-[var(--color-text-secondary)] mb-2">暂无策略</p>
+        <p class="text-sm text-[var(--color-text-muted)] mb-4">创建你的第一个量化策略</p>
+        <NButton type="primary" @click="router.push('/strategy/new')">
+          <template #icon><PhPlus :size="16" /></template>
+          新建策略
+        </NButton>
+      </div>
+    </template>
   </div>
 </template>
