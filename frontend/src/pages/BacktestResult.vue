@@ -136,124 +136,184 @@ function formatNumber(value: number | undefined): string {
 </script>
 
 <template>
-  <div class="flex flex-col gap-6">
-    <!-- Header -->
-    <div class="flex items-center gap-3 mb-2">
+  <div class="flex flex-col gap-8">
+    <!-- Header: breadcrumb + strategy name -->
+    <header class="flex items-center gap-3">
       <button
-        class="flex items-center gap-1 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors cursor-pointer"
+        class="inline-flex items-center gap-1.5 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors cursor-pointer"
         @click="router.back()"
       >
         <PhArrowLeft :size="16" />
         返回
       </button>
-      <h2 class="text-xl font-bold text-[var(--color-text-primary)]">{{ strategyId }} 回测</h2>
-    </div>
+      <span class="w-px h-4 bg-[var(--color-border-muted)]"></span>
+      <span class="text-lg font-semibold text-[var(--color-text-primary)]">{{ strategyId }}</span>
+    </header>
 
-    <!-- Config -->
-    <div class="glass-panel p-5">
-      <div class="flex items-end gap-4 flex-wrap">
-        <div class="flex flex-col gap-1">
-          <span class="text-xs text-[var(--color-text-secondary)]">开始日期</span>
-          <NDatePicker
-            v-model:value="startDate"
-            type="date"
-            clearable
-            :is-date-disabled="(date: number) => {
-              if (!availableDates?.start_date || !availableDates?.end_date) return false
-              const min = new Date(availableDates.start_date).getTime()
-              const max = new Date(availableDates.end_date).getTime()
-              return date < min || date > max
-            }"
-          />
+    <!-- Config section -->
+    <section>
+      <div class="flex flex-col gap-0.5 mb-4">
+        <span class="text-[11px] font-medium tracking-[0.06em] text-[var(--color-text-muted)]">回测参数</span>
+        <span class="text-lg font-semibold text-[var(--color-text-primary)]">配置区间</span>
+      </div>
+      <div class="glass-panel p-5">
+        <div class="flex items-end gap-4 flex-wrap">
+          <div class="flex flex-col gap-1.5">
+            <span class="text-[11px] font-medium tracking-[0.06em] text-[var(--color-text-muted)]">开始日期</span>
+            <NDatePicker
+              v-model:value="startDate"
+              type="date"
+              clearable
+              :is-date-disabled="(date: number) => {
+                if (!availableDates?.start_date || !availableDates?.end_date) return false
+                const min = new Date(availableDates.start_date).getTime()
+                const max = new Date(availableDates.end_date).getTime()
+                return date < min || date > max
+              }"
+            />
+          </div>
+
+          <div class="flex flex-col gap-1.5">
+            <span class="text-[11px] font-medium tracking-[0.06em] text-[var(--color-text-muted)]">结束日期</span>
+            <NDatePicker
+              v-model:value="endDate"
+              type="date"
+              clearable
+              :is-date-disabled="(date: number) => {
+                if (!availableDates?.start_date || !availableDates?.end_date) return false
+                const min = new Date(availableDates.start_date).getTime()
+                const max = new Date(availableDates.end_date).getTime()
+                return date < min || date > max
+              }"
+            />
+          </div>
+
+          <NButton
+            type="primary"
+            @click="handleRunBacktest"
+            :loading="loading"
+            :disabled="!startDate || !endDate"
+          >
+            运行回测
+          </NButton>
         </div>
 
-        <div class="flex flex-col gap-1">
-          <span class="text-xs text-[var(--color-text-secondary)]">结束日期</span>
-          <NDatePicker
-            v-model:value="endDate"
-            type="date"
-            clearable
-            :is-date-disabled="(date: number) => {
-              if (!availableDates?.start_date || !availableDates?.end_date) return false
-              const min = new Date(availableDates.start_date).getTime()
-              const max = new Date(availableDates.end_date).getTime()
-              return date < min || date > max
-            }"
-          />
-        </div>
-
-        <NButton
-          type="primary"
-          @click="handleRunBacktest"
-          :loading="loading"
-          :disabled="!startDate || !endDate"
+        <div
+          v-if="availableDates && availableDates.trade_date_count > 0"
+          class="mt-4 bg-[var(--color-surface-inset)] rounded-lg p-3 text-sm text-[var(--color-text-secondary)]"
         >
-          运行回测
-        </NButton>
+          可用日期范围: {{ availableDates.start_date }} 至 {{ availableDates.end_date }}
+          <span class="text-[var(--color-text-muted)]">(共 {{ availableDates.trade_date_count }} 个交易日)</span>
+        </div>
       </div>
+    </section>
 
-      <div
-        v-if="availableDates && availableDates.trade_date_count > 0"
-        class="mt-3 rounded-lg p-3 text-sm text-[var(--color-text-secondary)] bg-[var(--color-accent-muted)]"
-      >
-        可用日期范围: {{ availableDates.start_date }} 至 {{ availableDates.end_date }}
-        (共 {{ availableDates.trade_date_count }} 个交易日)
-      </div>
-    </div>
-
-    <!-- Error -->
+    <!-- Error banner -->
     <div
       v-if="error"
-      class="rounded-lg p-4 text-sm border-l-4 border-l-[var(--color-error)] bg-[rgba(239,68,68,0.08)] text-[var(--color-text-primary)]"
+      class="flex rounded-lg overflow-hidden"
     >
-      {{ error }}
+      <div class="w-1 bg-[var(--color-error)] flex-shrink-0"></div>
+      <div class="flex-1 px-4 py-3 text-sm bg-[rgba(239,68,68,0.06)] text-[var(--color-text-primary)]">
+        {{ error }}
+      </div>
     </div>
 
+    <!-- Results -->
     <NSpin :show="loading">
-      <div v-if="result" class="flex flex-col gap-4">
-        <!-- Metrics -->
-        <div class="glass-panel p-5">
-          <div class="flex justify-around flex-wrap gap-6">
-            <NStatistic label="总收益" :value="formatPercent(result.metrics.total_return)" :value-style="monoValueStyle">
-              <template #prefix>
-                <span :class="result.metrics.total_return >= 0 ? 'text-up' : 'text-down'">●</span>
-              </template>
-            </NStatistic>
-
-            <NStatistic label="年化收益" :value="formatPercent(result.metrics.annual_return)" :value-style="monoValueStyle">
-              <template #prefix>
-                <span :class="result.metrics.annual_return >= 0 ? 'text-up' : 'text-down'">●</span>
-              </template>
-            </NStatistic>
-
-            <NStatistic label="夏普比率" :value="formatNumber(result.metrics.sharpe_ratio)" :value-style="monoValueStyle" />
-
-            <NStatistic label="最大回撤" :value="formatPercent(result.metrics.max_drawdown)" :value-style="monoValueStyle" />
-
-            <NStatistic label="月度胜率" :value="formatPercent(result.metrics.monthly_win_rate)" :value-style="monoValueStyle" />
-
-            <NStatistic label="调仓次数" :value="result.period.rebalance_count" :value-style="monoValueStyle" />
+      <div v-if="result" class="flex flex-col gap-8">
+        <!-- Core metrics -->
+        <section>
+          <div class="flex flex-col gap-0.5 mb-4">
+            <span class="text-[11px] font-medium tracking-[0.06em] text-[var(--color-text-muted)]">核心指标</span>
+            <span class="text-lg font-semibold text-[var(--color-text-primary)]">回测表现</span>
           </div>
-        </div>
+          <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <div class="glass-panel p-5 flex flex-col gap-2">
+              <span class="text-[11px] font-medium tracking-[0.06em] text-[var(--color-text-muted)]">总收益</span>
+              <span
+                class="text-3xl font-bold data-mono leading-tight"
+                :class="result.metrics.total_return >= 0 ? 'text-up' : 'text-down'"
+              >
+                {{ formatPercent(result.metrics.total_return) }}
+              </span>
+            </div>
 
-        <!-- Charts -->
-        <div v-if="navData" class="glass-panel p-5">
-          <h3 class="text-base font-semibold text-[var(--color-text-primary)] mb-3">净值曲线</h3>
-          <NavCurveChart
-            :dates="navData.dates"
-            :strategy-nav="navData.strategyNav"
-          />
-        </div>
+            <div class="glass-panel p-5 flex flex-col gap-2">
+              <span class="text-[11px] font-medium tracking-[0.06em] text-[var(--color-text-muted)]">年化收益</span>
+              <span
+                class="text-3xl font-bold data-mono leading-tight"
+                :class="result.metrics.annual_return >= 0 ? 'text-up' : 'text-down'"
+              >
+                {{ formatPercent(result.metrics.annual_return) }}
+              </span>
+            </div>
 
-        <div v-if="monthlyReturns.length > 0" class="glass-panel p-5">
-          <h3 class="text-base font-semibold text-[var(--color-text-primary)] mb-3">月度收益分布</h3>
-          <MonthlyDistribution :data="monthlyReturns" />
-        </div>
+            <div class="glass-panel p-5 flex flex-col gap-2">
+              <span class="text-[11px] font-medium tracking-[0.06em] text-[var(--color-text-muted)]">夏普比率</span>
+              <span class="text-3xl font-bold data-mono leading-tight text-[var(--color-text-primary)]">
+                {{ formatNumber(result.metrics.sharpe_ratio) }}
+              </span>
+            </div>
 
-        <div v-if="yearlyHeatmapData.data.length > 0" class="glass-panel p-5">
-          <h3 class="text-base font-semibold text-[var(--color-text-primary)] mb-3">年度热力图</h3>
-          <YearlyHeatmap :data="yearlyHeatmapData.data" :years="yearlyHeatmapData.years" />
-        </div>
+            <div class="glass-panel p-5 flex flex-col gap-2">
+              <span class="text-[11px] font-medium tracking-[0.06em] text-[var(--color-text-muted)]">最大回撤</span>
+              <span class="text-3xl font-bold data-mono leading-tight text-down">
+                {{ formatPercent(result.metrics.max_drawdown) }}
+              </span>
+            </div>
+
+            <div class="glass-panel p-5 flex flex-col gap-2">
+              <span class="text-[11px] font-medium tracking-[0.06em] text-[var(--color-text-muted)]">月度胜率</span>
+              <span class="text-3xl font-bold data-mono leading-tight text-[var(--color-text-primary)]">
+                {{ formatPercent(result.metrics.monthly_win_rate) }}
+              </span>
+            </div>
+
+            <div class="glass-panel p-5 flex flex-col gap-2">
+              <span class="text-[11px] font-medium tracking-[0.06em] text-[var(--color-text-muted)]">调仓次数</span>
+              <span class="text-3xl font-bold data-mono leading-tight text-[var(--color-text-primary)]">
+                {{ result.period.rebalance_count }}
+              </span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Nav curve chart -->
+        <section v-if="navData">
+          <div class="flex flex-col gap-0.5 mb-4">
+            <span class="text-[11px] font-medium tracking-[0.06em] text-[var(--color-text-muted)]">净值曲线</span>
+            <span class="text-lg font-semibold text-[var(--color-text-primary)]">走势对比</span>
+          </div>
+          <div class="glass-panel p-5">
+            <NavCurveChart
+              :dates="navData.dates"
+              :strategy-nav="navData.strategyNav"
+            />
+          </div>
+        </section>
+
+        <!-- Monthly distribution -->
+        <section v-if="monthlyReturns.length > 0">
+          <div class="flex flex-col gap-0.5 mb-4">
+            <span class="text-[11px] font-medium tracking-[0.06em] text-[var(--color-text-muted)]">月度收益分布</span>
+            <span class="text-lg font-semibold text-[var(--color-text-primary)]">收益拆解</span>
+          </div>
+          <div class="glass-panel p-5">
+            <MonthlyDistribution :data="monthlyReturns" />
+          </div>
+        </section>
+
+        <!-- Yearly heatmap -->
+        <section v-if="yearlyHeatmapData.data.length > 0">
+          <div class="flex flex-col gap-0.5 mb-4">
+            <span class="text-[11px] font-medium tracking-[0.06em] text-[var(--color-text-muted)]">年度热力图</span>
+            <span class="text-lg font-semibold text-[var(--color-text-primary)]">月度收益一览</span>
+          </div>
+          <div class="glass-panel p-5">
+            <YearlyHeatmap :data="yearlyHeatmapData.data" :years="yearlyHeatmapData.years" />
+          </div>
+        </section>
       </div>
     </NSpin>
   </div>

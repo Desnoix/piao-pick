@@ -282,194 +282,464 @@ onUnmounted(() => {
 
 <template>
   <NSpin :show="loading">
-    <div class="flex flex-col gap-6">
-      <!-- Header -->
-      <div class="flex items-center justify-between">
-        <div>
-          <h2 class="text-xl font-bold text-[var(--color-text-primary)]">数据状态</h2>
-          <p class="text-sm text-[var(--color-text-secondary)] mt-1">查看数据库状态和同步数据</p>
-        </div>
-        <NButton type="primary" :loading="syncing" @click="handleSync">
-          手动同步
+    <div class="flex flex-col gap-8">
+
+      <!-- Operational header: sync action right-aligned -->
+      <header class="flex items-center justify-between">
+        <span class="text-sm text-[var(--color-text-muted)]">
+          {{ status ? `${status.stock_count} 只股票已入库` : '' }}
+        </span>
+        <NButton type="primary" :loading="syncing" size="small" @click="handleSync">
+          <template #icon><PhArrowsClockwise :size="14" /></template>
+          同步当日
         </NButton>
-      </div>
+      </header>
 
       <!-- DB Overview -->
-      <div class="glass-panel p-5">
-        <h3 class="flex items-center gap-2 text-base font-semibold text-[var(--color-text-primary)] mb-4">
-          <PhDatabase :size="18" class="text-[var(--color-text-secondary)]" />
-          数据库概览
-        </h3>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div
-            v-for="row in statusRows"
-            :key="row.key"
-            class="flex items-center justify-between p-3 rounded-lg bg-[var(--color-surface-inset)]"
-          >
-            <span class="text-sm text-[var(--color-text-secondary)]">{{ row.key }}</span>
-            <span class="data-mono text-sm text-[var(--color-text-primary)]">{{ row.value }}</span>
+      <section>
+        <div class="section-header">
+          <span class="section-label">数据库</span>
+          <h3 class="section-title">概览</h3>
+        </div>
+        <div class="glass-panel overflow-hidden">
+          <div class="kv-grid">
+            <div
+              v-for="(row, i) in statusRows"
+              :key="row.key"
+              class="kv-row"
+              :class="{ 'kv-row--last': i === statusRows.length - 1 }"
+            >
+              <span class="kv-key">{{ row.key }}</span>
+              <span class="kv-val data-mono">{{ row.value }}</span>
+            </div>
           </div>
         </div>
-      </div>
+      </section>
 
       <!-- History Sync -->
-      <div class="glass-panel p-5">
-        <h3 class="flex items-center gap-2 text-base font-semibold text-[var(--color-text-primary)] mb-2">
-          <PhArrowsClockwise :size="18" class="text-[var(--color-text-secondary)]" />
-          历史数据同步
-        </h3>
-        <p class="text-sm text-[var(--color-text-secondary)] mb-4">
-          批量拉取全市场历史K线数据 (约需要 30-60 分钟)。支持断点续传，可随时暂停和恢复。
-        </p>
-
-        <div class="flex items-end gap-4 flex-wrap">
-          <div class="flex-1 min-w-[160px]">
-            <label class="block text-xs text-[var(--color-text-secondary)] mb-1">开始日期</label>
-            <NDatePicker
-              v-model:value="historyStartDate"
-              type="date"
-              :disabled="isHistorySyncActive"
-              clearable
-            />
-          </div>
-          <div class="flex-1 min-w-[160px]">
-            <label class="block text-xs text-[var(--color-text-secondary)] mb-1">结束日期</label>
-            <NDatePicker
-              v-model:value="historyEndDate"
-              type="date"
-              :disabled="isHistorySyncActive"
-              clearable
-            />
-          </div>
-          <div class="w-40">
-            <label class="block text-xs text-[var(--color-text-secondary)] mb-1">复权类型</label>
-            <NSelect
-              v-model:value="adjustType"
-              :options="adjustTypeOptions"
-              :disabled="isHistorySyncActive"
-              size="small"
-            />
-          </div>
-          <div class="w-40 pb-0.5">
-            <NButton
-              type="primary"
-              :loading="historySyncing"
-              :disabled="isHistorySyncActive"
-              block
-              @click="handleHistorySync"
-            >
-              开始拉取历史数据
-            </NButton>
-          </div>
+      <section>
+        <div class="section-header">
+          <span class="section-label">历史数据</span>
+          <h3 class="section-title">K线同步</h3>
         </div>
+        <div class="glass-panel">
+          <div class="section-body">
+            <p class="section-desc">
+              批量拉取全市场历史K线，约 30-60 分钟。支持断点续传。
+            </p>
 
-        <!-- Task Progress -->
-        <div
-          v-if="historySyncTask"
-          class="mt-4 rounded-lg p-4 border-l-4"
-          :class="taskBorderClass"
-        >
-          <div class="text-sm font-semibold text-[var(--color-text-primary)] mb-3">
-            同步任务: {{ getStatusText(historySyncTask.status) }}
+            <!-- Action bar -->
+            <div class="sync-bar">
+              <div class="sync-field">
+                <label class="field-label">起始</label>
+                <NDatePicker
+                  v-model:value="historyStartDate"
+                  type="date"
+                  :disabled="isHistorySyncActive"
+                  clearable
+                  size="small"
+                />
+              </div>
+              <span class="sync-sep">&mdash;</span>
+              <div class="sync-field">
+                <label class="field-label">截止</label>
+                <NDatePicker
+                  v-model:value="historyEndDate"
+                  type="date"
+                  :disabled="isHistorySyncActive"
+                  clearable
+                  size="small"
+                />
+              </div>
+              <div class="sync-field sync-field--select">
+                <label class="field-label">复权</label>
+                <NSelect
+                  v-model:value="adjustType"
+                  :options="adjustTypeOptions"
+                  :disabled="isHistorySyncActive"
+                  size="small"
+                />
+              </div>
+              <NButton
+                type="primary"
+                :loading="historySyncing"
+                :disabled="isHistorySyncActive"
+                size="small"
+                @click="handleHistorySync"
+              >
+                启动同步
+              </NButton>
+            </div>
           </div>
-          <div class="space-y-3">
+
+          <!-- Task Progress -->
+          <div
+            v-if="historySyncTask"
+            class="task-progress"
+            :class="taskBorderClass"
+          >
+            <div class="task-head">
+              <span class="task-status-label">
+                {{ getStatusText(historySyncTask.status) }}
+              </span>
+              <span class="task-pct data-mono">
+                {{ historySyncStatus?.percent || 0 }}%
+              </span>
+            </div>
+
             <NProgress
               type="line"
               :percentage="historySyncStatus?.percent || 0"
               :status="historySyncTask.status === 'failed' ? 'error' : 'default'"
+              :show-indicator="false"
             />
 
-            <div class="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
-              <div>
-                <span class="text-[var(--color-text-secondary)]">股票总数:</span>
-                <div class="data-mono text-[var(--color-text-primary)]">{{ historySyncTask.progress.total }}</div>
+            <div class="task-metrics">
+              <div class="task-metric">
+                <span class="task-metric-label">总数</span>
+                <span class="task-metric-val data-mono">{{ historySyncTask.progress.total }}</span>
               </div>
-              <div>
-                <span class="text-[var(--color-text-secondary)]">已完成:</span>
-                <div class="data-mono text-[var(--color-text-primary)]">{{ historySyncTask.progress.completed }}</div>
+              <div class="task-metric">
+                <span class="task-metric-label">完成</span>
+                <span class="task-metric-val data-mono">{{ historySyncTask.progress.completed }}</span>
               </div>
-              <div>
-                <span class="text-[var(--color-text-secondary)]">失败:</span>
-                <div class="data-mono text-[var(--color-error)]">{{ historySyncTask.progress.failed }}</div>
+              <div class="task-metric">
+                <span class="task-metric-label">失败</span>
+                <span class="task-metric-val data-mono text-[var(--color-error)]">{{ historySyncTask.progress.failed }}</span>
               </div>
-              <div>
-                <span class="text-[var(--color-text-secondary)]">K线数:</span>
-                <div class="data-mono text-[var(--color-text-primary)]">{{ historySyncTask.progress.total_klines }}</div>
+              <div class="task-metric">
+                <span class="task-metric-label">K线</span>
+                <span class="task-metric-val data-mono">{{ historySyncTask.progress.total_klines }}</span>
               </div>
-              <div>
-                <span class="text-[var(--color-text-secondary)]">当前:</span>
-                <div class="data-mono truncate text-[var(--color-text-primary)]">
-                  <NTag v-if="historySyncTask.progress.current_stock" size="small">
-                    {{ historySyncTask.progress.current_stock }}
-                  </NTag>
-                  <span v-else class="text-[var(--color-text-muted)]">-</span>
-                </div>
+              <div class="task-metric task-metric--current">
+                <span class="task-metric-label">当前</span>
+                <NTag v-if="historySyncTask.progress.current_stock" size="small" round :bordered="false">
+                  {{ historySyncTask.progress.current_stock }}
+                </NTag>
+                <span v-else class="task-metric-val text-[var(--color-text-muted)]">&mdash;</span>
               </div>
             </div>
 
-            <div class="text-xs text-[var(--color-text-muted)]">
-              任务ID: {{ historySyncTask.task_id }} |
-              日期范围: {{ historySyncTask.start_date }} ~ {{ historySyncTask.end_date }} |
-              创建: {{ new Date(historySyncTask.created_at).toLocaleString('zh-CN') }}
+            <div class="task-meta">
+              <span class="data-mono">{{ historySyncTask.task_id }}</span>
+              <span class="task-meta-sep">/</span>
+              <span class="data-mono">{{ historySyncTask.start_date }} ~ {{ historySyncTask.end_date }}</span>
+              <span class="task-meta-sep">/</span>
+              <span>{{ new Date(historySyncTask.created_at).toLocaleString('zh-CN') }}</span>
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
       <!-- Factor Compute -->
-      <div class="glass-panel p-5">
-        <h3 class="flex items-center gap-2 text-base font-semibold text-[var(--color-text-primary)] mb-2">
-          <PhFunction :size="18" class="text-[var(--color-text-secondary)]" />
-          时序因子计算
-        </h3>
-        <p class="text-sm text-[var(--color-text-secondary)] mb-4">
-          基于已拉取的历史K线数据，计算时序因子 (20日动量、60日波动率、20日均换手率)。
-          请先完成历史数据同步，再执行因子计算。耗时取决于股票数量。
-        </p>
+      <section>
+        <div class="section-header">
+          <span class="section-label">因子引擎</span>
+          <h3 class="section-title">计算</h3>
+        </div>
+        <div class="glass-panel section-body">
+          <p class="section-desc">
+            基于历史K线计算时序因子: 20日动量、60日波动率、20日均换手率。需先完成K线同步。
+          </p>
 
-        <NButton
-          type="warning"
-          :loading="factorComputing"
-          @click="handleFactorCompute"
-        >
-          {{ factorComputing ? '计算中...' : '开始计算因子' }}
-        </NButton>
+          <div class="factor-action">
+            <NButton
+              type="warning"
+              :loading="factorComputing"
+              size="small"
+              @click="handleFactorCompute"
+            >
+              {{ factorComputing ? '计算中...' : '执行因子计算' }}
+            </NButton>
+          </div>
 
-        <div
-          v-if="factorResult"
-          class="mt-4 rounded-lg p-4 border-l-4 border-l-[var(--color-success)] bg-[rgba(34,197,94,0.08)]"
-        >
-          <div class="text-sm font-semibold text-[var(--color-text-primary)] mb-3">因子计算结果</div>
-          <div class="grid grid-cols-3 gap-3 text-sm">
-            <div>
-              <span class="text-[var(--color-text-secondary)]">总股票数:</span>
-              <div class="data-mono text-[var(--color-text-primary)]">{{ factorResult.total }}</div>
+          <div
+            v-if="factorResult"
+            class="factor-result"
+          >
+            <div class="factor-result-head">
+              <span class="factor-result-label">计算完成</span>
+              <NTag size="small" :bordered="false" type="success" round>
+                {{ factorResult.computed }} / {{ factorResult.total }}
+              </NTag>
             </div>
-            <div>
-              <span class="text-[var(--color-text-secondary)]">计算成功:</span>
-              <div class="data-mono text-[var(--color-success)]">{{ factorResult.computed }}</div>
-            </div>
-            <div>
-              <span class="text-[var(--color-text-secondary)]">计算失败:</span>
-              <div class="data-mono text-[var(--color-error)]">{{ factorResult.failed }}</div>
+            <div class="factor-result-grid">
+              <div class="factor-stat">
+                <span class="factor-stat-val data-mono text-[var(--color-success)]">{{ factorResult.computed }}</span>
+                <span class="factor-stat-label">成功</span>
+              </div>
+              <div class="factor-stat">
+                <span class="factor-stat-val data-mono text-[var(--color-error)]">{{ factorResult.failed }}</span>
+                <span class="factor-stat-label">失败</span>
+              </div>
+              <div class="factor-stat">
+                <span class="factor-stat-val data-mono">{{ factorResult.total }}</span>
+                <span class="factor-stat-label">总计</span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
       <!-- Calendar -->
-      <div class="glass-panel p-5">
-        <h3 class="flex items-center gap-2 text-base font-semibold text-[var(--color-text-primary)] mb-4">
-          <PhCalendarBlank :size="18" class="text-[var(--color-text-secondary)]" />
-          交易日历
-        </h3>
-        <NDataTable
-          :columns="calendarColumns"
-          :data="calendarRows"
-          size="small"
-          :bordered="false"
-        />
-      </div>
+      <section>
+        <div class="section-header">
+          <span class="section-label">交易日历</span>
+          <h3 class="section-title">近期交易日</h3>
+        </div>
+        <div class="glass-panel overflow-hidden">
+          <NDataTable
+            :columns="calendarColumns"
+            :data="calendarRows"
+            size="small"
+            :bordered="false"
+          />
+        </div>
+      </section>
     </div>
   </NSpin>
 </template>
+
+<style scoped>
+/* Section hierarchy */
+.section-header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 12px;
+}
+
+.section-label {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}
+
+.section-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.section-body {
+  padding: 20px;
+}
+
+.section-desc {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  margin: 0 0 16px 0;
+  line-height: 1.6;
+}
+
+/* Key-value grid for DB overview */
+.kv-grid {
+  display: flex;
+  flex-direction: column;
+}
+
+.kv-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.kv-row--last {
+  border-bottom: none;
+}
+
+.kv-key {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.kv-val {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+/* History sync action bar */
+.sync-bar {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.sync-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 140px;
+  flex: 1;
+}
+
+.sync-field--select {
+  min-width: 120px;
+  flex: 0 0 120px;
+}
+
+.field-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  letter-spacing: 0.04em;
+}
+
+.sync-sep {
+  color: var(--color-text-muted);
+  font-size: 14px;
+  padding-bottom: 8px;
+  flex-shrink: 0;
+}
+
+/* Task progress card */
+.task-progress {
+  padding: 16px 20px;
+  border-left: 3px solid;
+  border-top: 1px solid var(--color-border);
+}
+
+.task-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.task-status-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.task-pct {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.task-metrics {
+  display: flex;
+  gap: 20px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
+.task-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.task-metric-label {
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.task-metric-val {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.task-metric--current {
+  margin-left: auto;
+}
+
+.task-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 14px;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  flex-wrap: wrap;
+}
+
+.task-meta-sep {
+  color: var(--color-border-muted);
+}
+
+/* Factor compute */
+.factor-action {
+  display: flex;
+  align-items: center;
+}
+
+.factor-result {
+  margin-top: 16px;
+  padding: 14px 16px;
+  background: var(--color-surface-inset);
+  border-radius: 8px;
+}
+
+.factor-result-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.factor-result-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.factor-result-grid {
+  display: flex;
+  gap: 24px;
+}
+
+.factor-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.factor-stat-val {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.factor-stat-label {
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+/* Mobile */
+@media (max-width: 640px) {
+  .sync-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .sync-field,
+  .sync-field--select {
+    min-width: auto;
+    flex: auto;
+  }
+
+  .sync-sep {
+    display: none;
+  }
+
+  .task-metrics {
+    gap: 12px;
+  }
+
+  .task-metric--current {
+    margin-left: 0;
+  }
+
+  .factor-result-grid {
+    gap: 16px;
+  }
+}
+</style>

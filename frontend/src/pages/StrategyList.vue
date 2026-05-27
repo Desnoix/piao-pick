@@ -149,26 +149,27 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="flex flex-col gap-4">
-    <div class="flex items-center justify-between flex-wrap gap-3">
-      <div>
-        <h2 class="text-xl font-bold text-[var(--color-text-primary)]">策略管理</h2>
-        <p class="text-sm text-[var(--color-text-secondary)] mt-1">管理和回测你的量化策略</p>
-      </div>
-      <NSpace>
-        <NButton
-          :type="compareDisabled ? 'default' : 'warning'"
-          :disabled="compareDisabled"
-          @click="handleCompare"
-        >
-          对比 ({{ selectedIds.length }})
-        </NButton>
-        <NButton type="primary" @click="router.push('/strategy/new')">
-          <template #icon><PhPlus :size="16" /></template>
-          新建策略
-        </NButton>
-      </NSpace>
+  <div class="flex flex-col gap-8">
+    <!-- Action bar -->
+    <div class="flex items-center gap-2 flex-wrap">
+      <button
+        class="inline-flex items-center gap-2 rounded-full px-4 py-2 border text-sm transition-all"
+        :class="compareDisabled
+          ? 'border-[var(--color-border)] text-[var(--color-text-muted)] opacity-50 cursor-not-allowed'
+          : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] hover:bg-[var(--color-accent-muted)] cursor-pointer'"
+        :disabled="compareDisabled"
+        @click="handleCompare"
+      >
+        <PhSlidersHorizontal :size="15" weight="duotone" />
+        对比 ({{ selectedIds.length }})
+      </button>
+      <NButton type="primary" @click="router.push('/strategy/new')">
+        <template #icon><PhPlus :size="16" /></template>
+        新建策略
+      </NButton>
     </div>
+
+    <!-- Error alert -->
     <NAlert v-if="fetchError" type="error" closable @close="fetchError = null">
       <div class="flex items-center justify-between">
         <span>{{ fetchError }}</span>
@@ -177,27 +178,52 @@ onMounted(async () => {
         </NButton>
       </div>
     </NAlert>
-    <div class="glass-panel overflow-hidden">
+
+    <!-- Strategy table -->
+    <div v-if="strategyStore.strategies.length > 0 || strategyStore.loading" class="glass-panel overflow-hidden strategy-table">
       <NDataTable
         :columns="columns"
         :data="strategyStore.strategies"
         :loading="strategyStore.loading"
+        :bordered="false"
         :row-key="(row: Strategy) => row.id"
         v-model:checked-row-keys="selectedIds"
         size="small"
-        striped
+        :single-line="false"
       />
     </div>
-    <template v-if="strategyStore.strategies.length === 0 && !strategyStore.loading && !fetchError">
-      <div class="glass-panel p-12 text-center mt-4">
-        <PhSlidersHorizontal :size="48" class="text-[var(--color-text-muted)] opacity-40 mx-auto mb-4" />
-        <p class="text-base text-[var(--color-text-secondary)] mb-2">暂无策略</p>
-        <p class="text-sm text-[var(--color-text-muted)] mb-4">创建你的第一个量化策略</p>
-        <NButton type="primary" @click="router.push('/strategy/new')">
-          <template #icon><PhPlus :size="16" /></template>
-          新建策略
-        </NButton>
-      </div>
-    </template>
+
+    <!-- Empty state -->
+    <div
+      v-if="strategyStore.strategies.length === 0 && !strategyStore.loading && !fetchError"
+      class="glass-panel flex flex-col items-center justify-center py-20"
+    >
+      <PhSlidersHorizontal
+        :size="64"
+        class="text-[var(--color-text-muted)] opacity-30 mb-5"
+        weight="duotone"
+      />
+      <p class="text-base font-medium text-[var(--color-text-secondary)] mb-2">暂无策略</p>
+      <p class="text-sm text-[var(--color-text-muted)] mb-5">创建你的第一个量化策略</p>
+      <NButton type="primary" @click="router.push('/strategy/new')">
+        <template #icon><PhPlus :size="16" /></template>
+        新建策略
+      </NButton>
+    </div>
   </div>
 </template>
+
+<style scoped>
+.strategy-table :deep(.n-data-table-thead) {
+  background: var(--color-surface-inset) !important;
+}
+
+.strategy-table :deep(.n-data-table-th) {
+  color: var(--color-text-secondary) !important;
+  font-weight: 500;
+}
+
+.strategy-table :deep(.n-data-table-tr:hover) td {
+  background: var(--color-surface-inset) !important;
+}
+</style>

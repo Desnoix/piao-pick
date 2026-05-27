@@ -434,104 +434,109 @@ watch(
 
 <template>
   <NSpin :show="loading">
-    <div class="max-w-[1200px] flex flex-col gap-4">
-      <!-- Breadcrumb -->
-      <div class="flex items-center gap-2 text-sm">
-        <router-link to="/strategy/list" class="text-[var(--color-accent)] hover:underline text-sm">策略</router-link>
-        <span class="text-[var(--color-text-muted)]">/</span>
-        <span class="text-[var(--color-text-secondary)]">{{ isNew ? '新建策略' : displayName || '编辑' }}</span>
+    <div class="strategy-edit flex flex-col gap-6 max-w-[1200px]">
+
+      <!-- Action bar -->
+      <div class="action-bar">
+        <div class="action-bar__left">
+          <NButton size="small" ghost @click="router.push('/strategy/list')">取消</NButton>
+          <NButton v-if="!isNew" size="small" ghost @click="handleReset">重置</NButton>
+        </div>
+        <div class="action-bar__right">
+          <button class="mode-toggle" :class="{ 'mode-toggle--raw': rawMode }" @click="toggleRawMode">
+            <span class="mode-toggle__dot" />
+            <span class="mode-toggle__label">{{ rawMode ? '可视化编辑' : 'YAML 模式' }}</span>
+          </button>
+          <NButton type="primary" :loading="saving" @click="save">保存策略</NButton>
+        </div>
       </div>
 
-      <!-- Top Bar -->
-      <div class="flex items-center justify-between flex-wrap gap-2">
-        <h2 class="text-xl font-bold text-[var(--color-text-primary)]">
-          {{ isNew ? '新建策略' : '编辑策略' }}
-        </h2>
-        <NSpace>
-          <NButton size="small" @click="toggleRawMode">
-            {{ rawMode ? '可视化编辑' : 'YAML 模式' }}
-          </NButton>
-          <NButton @click="router.push('/strategy/list')">取消</NButton>
-          <NButton v-if="!isNew" @click="handleReset">重置</NButton>
-          <NButton type="primary" :loading="saving" @click="save">保存</NButton>
-        </NSpace>
-      </div>
-
-      <NAlert v-if="parseError" type="error" class="mb-2">
+      <NAlert v-if="parseError" type="error">
         {{ parseError }}
       </NAlert>
 
       <!-- Raw YAML Mode -->
       <template v-if="rawMode">
-        <NForm label-placement="left" label-width="100">
-          <NFormItem v-if="isNew" label="标识">
-            <NInput v-model:value="name" placeholder="策略唯一标识 (英文)" />
-          </NFormItem>
-          <NFormItem label="配置 (YAML)">
+        <div class="glass-panel p-6 flex flex-col gap-4">
+          <NForm v-if="isNew" label-placement="left" label-width="100">
+            <NFormItem label="标识">
+              <NInput v-model:value="name" placeholder="策略唯一标识 (英文)" />
+            </NFormItem>
+          </NForm>
+          <div>
+            <span class="section-label">YAML 配置</span>
             <NInput
               v-model:value="rawConfig"
               type="textarea"
               :rows="30"
               placeholder="策略 YAML 配置"
-              class="font-mono"
+              class="font-mono yaml-editor"
             />
-          </NFormItem>
-        </NForm>
+          </div>
+        </div>
       </template>
 
       <!-- Visual Editor Mode -->
       <template v-else>
-        <!-- Basic Info -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <NForm label-placement="left" label-width="80">
-            <NFormItem v-if="isNew" label="标识">
-              <NInput v-model:value="name" placeholder="策略唯一标识 (英文)" />
-            </NFormItem>
-            <NFormItem label="名称">
-              <NInput v-model:value="displayName" placeholder="显示名称" />
-            </NFormItem>
-            <NFormItem label="类别">
-              <NSelect
-                v-model:value="category"
-                :options="categoryOptions"
-                placeholder="选择类别"
-                clearable
-              />
-            </NFormItem>
-          </NForm>
-          <NForm label-placement="left" label-width="80">
-            <NFormItem label="描述">
-              <NInput
-                v-model:value="description"
-                type="textarea"
-                :rows="3"
-                placeholder="策略描述"
-              />
-            </NFormItem>
-          </NForm>
-        </div>
 
-        <NDivider />
+        <!-- Basic info -->
+        <section class="flex flex-col gap-2">
+          <span class="section-label">基本信息</span>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <NForm label-placement="left" label-width="80" class="glass-panel p-5">
+              <NFormItem v-if="isNew" label="标识">
+                <NInput v-model:value="name" placeholder="策略唯一标识 (英文)" />
+              </NFormItem>
+              <NFormItem label="名称">
+                <NInput v-model:value="displayName" placeholder="显示名称" />
+              </NFormItem>
+              <NFormItem label="类别">
+                <NSelect
+                  v-model:value="category"
+                  :options="categoryOptions"
+                  placeholder="选择类别"
+                  clearable
+                />
+              </NFormItem>
+            </NForm>
+            <NForm label-placement="left" label-width="80" class="glass-panel p-5">
+              <NFormItem label="描述">
+                <NInput
+                  v-model:value="description"
+                  type="textarea"
+                  :rows="3"
+                  placeholder="策略描述"
+                />
+              </NFormItem>
+            </NForm>
+          </div>
+        </section>
 
-        <!-- Section 1: Universe Filters -->
+        <!-- Universe filters -->
         <NCollapse :default-expanded-names="['universe']" arrow-placement="left">
-          <NCollapseItem title="选股池 (Universe)" name="universe">
-            <div class="glass-panel p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <NCollapseItem name="universe">
+            <template #header>
+              <div class="collapse-header">
+                <span class="collapse-header__label">选股条件</span>
+                <span class="collapse-header__title">选股池</span>
+              </div>
+            </template>
+            <div class="glass-panel p-5 grid grid-cols-1 md:grid-cols-2 gap-5">
               <div class="flex flex-col gap-3">
-                <div class="flex items-center justify-between">
-                  <span class="text-sm text-[var(--color-text-secondary)]">排除 ST 股票</span>
+                <div class="universe-row">
+                  <span class="universe-row__label">排除 ST 股票</span>
                   <NSwitch v-model:value="universe.exclude_st" />
                 </div>
-                <div class="flex items-center justify-between">
-                  <span class="text-sm text-[var(--color-text-secondary)]">排除停牌股</span>
+                <div class="universe-row">
+                  <span class="universe-row__label">排除停牌股</span>
                   <NSwitch v-model:value="universe.exclude_suspended" />
                 </div>
-                <div class="flex items-center justify-between">
-                  <span class="text-sm text-[var(--color-text-secondary)]">排除北交所</span>
+                <div class="universe-row">
+                  <span class="universe-row__label">排除北交所</span>
                   <NSwitch v-model:value="universe.exclude_bse" />
                 </div>
-                <div class="flex items-center justify-between">
-                  <span class="text-sm text-[var(--color-text-secondary)]">排除次新股 (上市天数)</span>
+                <div class="universe-row">
+                  <span class="universe-row__label">排除次新股 (上市天数)</span>
                   <NInputNumber
                     v-model:value="universe.exclude_new_listing_days"
                     :min="0"
@@ -542,8 +547,8 @@ watch(
                 </div>
               </div>
               <div class="flex flex-col gap-3">
-                <div class="flex items-center justify-between">
-                  <span class="text-sm text-[var(--color-text-secondary)]">最小市值 (亿元)</span>
+                <div class="universe-row">
+                  <span class="universe-row__label">最小市值 (亿元)</span>
                   <NInputNumber
                     v-model:value="universe.min_market_cap"
                     :min="0"
@@ -552,8 +557,8 @@ watch(
                     style="width: 160px"
                   />
                 </div>
-                <div class="flex items-center justify-between">
-                  <span class="text-sm text-[var(--color-text-secondary)]">最小日均成交额 (万元)</span>
+                <div class="universe-row">
+                  <span class="universe-row__label">最小日均成交额 (万元)</span>
                   <NInputNumber
                     v-model:value="universe.min_daily_amount"
                     :min="0"
@@ -567,58 +572,53 @@ watch(
           </NCollapseItem>
         </NCollapse>
 
-        <NDivider />
-
-        <!-- Section 2: Factor Weights -->
+        <!-- Factor weights -->
         <NCollapse :default-expanded-names="['factors']" arrow-placement="left">
           <NCollapseItem name="factors">
             <template #header>
-              <div class="flex items-center gap-2">
-                <span class="text-sm font-semibold text-[var(--color-text-primary)]">因子权重</span>
-                <NTag size="small" :type="weightNormalized ? 'success' : 'warning'">
-                  已启用: {{ enabledFactorCount }} | 总权重: {{ totalWeight }}%
-                </NTag>
+              <div class="collapse-header">
+                <span class="collapse-header__label">因子配置</span>
+                <span class="collapse-header__title">因子权重</span>
+                <span class="weight-status" :class="weightNormalized ? 'weight-status--ok' : 'weight-status--warn'">
+                  {{ enabledFactorCount }} 项 / {{ totalWeight }}%
+                </span>
                 <NButton
                   v-if="!weightNormalized && enabledFactorCount > 0"
                   size="tiny"
                   type="primary"
+                  ghost
                   @click.stop="normalizeWeights"
                 >
                   自动归一
                 </NButton>
               </div>
             </template>
-            <div class="glass-panel p-4 flex flex-col gap-2">
-              <div v-if="factors.length === 0" class="text-center py-8 text-sm text-[var(--color-text-muted)]">
+            <div class="glass-panel factor-panel">
+              <div v-if="factors.length === 0" class="text-center py-10 text-sm text-[var(--color-text-muted)]">
                 暂无可用因子
               </div>
               <div
-                v-for="factor in factors"
+                v-for="(factor, idx) in factors"
                 :key="factor.id"
-                class="flex items-center gap-3 p-2 rounded border transition-colors"
-                :class="[
-                  factor.enabled
-                    ? 'border-[var(--color-border)] bg-[var(--color-surface-inset)]'
-                    : 'border-[var(--color-border-muted)] opacity-40',
-                ]"
+                class="factor-row"
+                :class="{ 'factor-row--disabled': !factor.enabled, 'factor-row--last': idx === factors.length - 1 }"
               >
                 <NSwitch
                   :value="factor.enabled"
                   size="small"
                   @update:value="(val: boolean) => toggleFactor(factor.id, val)"
                 />
-                <div class="w-32 shrink-0">
-                  <div class="text-sm font-medium text-[var(--color-text-primary)]">{{ getFactorLabel(factor.id) }}</div>
-                  <NTag size="tiny" class="mt-0.5">
-                    {{ getFactorCategory(factor.id) }}
-                  </NTag>
+                <div class="factor-row__info">
+                  <div class="factor-row__name">{{ getFactorLabel(factor.id) }}</div>
+                  <NTag size="tiny" :bordered="false">{{ getFactorCategory(factor.id) }}</NTag>
                 </div>
                 <NTooltip>
                   <template #trigger>
                     <NTag
                       size="tiny"
                       :type="factor.direction === 'positive' ? 'error' : 'success'"
-                      class="shrink-0 cursor-pointer"
+                      :bordered="false"
+                      class="cursor-pointer"
                       @click="
                         updateDirection(
                           factor.id,
@@ -655,16 +655,21 @@ watch(
           </NCollapseItem>
         </NCollapse>
 
-        <NDivider />
-
-        <!-- Section 3: Filters -->
+        <!-- Filter rules -->
         <NCollapse :default-expanded-names="['filters']" arrow-placement="left">
-          <NCollapseItem title="过滤规则" name="filters">
-            <div class="glass-panel p-4 flex flex-col gap-3">
+          <NCollapseItem name="filters">
+            <template #header>
+              <div class="collapse-header">
+                <span class="collapse-header__label">筛选条件</span>
+                <span class="collapse-header__title">过滤规则</span>
+              </div>
+            </template>
+            <div class="glass-panel filter-panel p-5">
               <div
                 v-for="(filter, index) in filters"
                 :key="index"
-                class="flex items-center gap-3 p-3 rounded border border-[var(--color-border)]"
+                class="filter-row"
+                :class="{ 'filter-row--last': index === filters.length - 1 }"
               >
                 <NSelect
                   v-model:value="filter.type"
@@ -673,7 +678,7 @@ watch(
                   style="width: 160px"
                 />
                 <template v-if="filter.type === 'percentile_top'">
-                  <span class="text-sm text-[var(--color-text-secondary)]">保留前</span>
+                  <span class="filter-row__text">保留前</span>
                   <NInputNumber
                     v-model:value="filter.value"
                     :min="1"
@@ -681,10 +686,10 @@ watch(
                     size="small"
                     style="width: 100px"
                   />
-                  <span class="text-sm text-[var(--color-text-muted)]">只</span>
+                  <span class="filter-row__unit">只</span>
                 </template>
                 <template v-else-if="filter.type === 'industry_diversify'">
-                  <span class="text-sm text-[var(--color-text-secondary)]">每行业最多</span>
+                  <span class="filter-row__text">每行业最多</span>
                   <NInputNumber
                     v-model:value="filter.max_per_industry"
                     :min="1"
@@ -692,10 +697,10 @@ watch(
                     size="small"
                     style="width: 100px"
                   />
-                  <span class="text-sm text-[var(--color-text-muted)]">只</span>
+                  <span class="filter-row__unit">只</span>
                 </template>
                 <template v-else-if="filter.type === 'market_cap_min'">
-                  <span class="text-sm text-[var(--color-text-secondary)]">最小市值</span>
+                  <span class="filter-row__text">最小市值</span>
                   <NInputNumber
                     v-model:value="filter.value"
                     :min="0"
@@ -703,7 +708,7 @@ watch(
                     size="small"
                     style="width: 140px"
                   />
-                  <span class="text-sm text-[var(--color-text-muted)]">亿元</span>
+                  <span class="filter-row__unit">亿元</span>
                 </template>
                 <NButton
                   size="small"
@@ -714,19 +719,23 @@ watch(
                   删除
                 </NButton>
               </div>
-              <NButton size="small" @click="addFilter">添加过滤规则</NButton>
+              <NButton size="small" dashed @click="addFilter">添加过滤规则</NButton>
             </div>
           </NCollapseItem>
         </NCollapse>
 
-        <NDivider />
-
-        <!-- Section 4: Output -->
+        <!-- Output settings -->
         <NCollapse :default-expanded-names="['output']" arrow-placement="left">
-          <NCollapseItem title="输出设置" name="output">
-            <div class="glass-panel p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <NCollapseItem name="output">
+            <template #header>
+              <div class="collapse-header">
+                <span class="collapse-header__label">结果配置</span>
+                <span class="collapse-header__title">输出设置</span>
+              </div>
+            </template>
+            <div class="glass-panel p-5 grid grid-cols-1 md:grid-cols-3 gap-5">
               <div>
-                <div class="text-sm mb-1 text-[var(--color-text-secondary)]">最大股票数</div>
+                <span class="field-label">最大股票数</span>
                 <NInputNumber
                   v-model:value="output.max_stocks"
                   :min="1"
@@ -736,7 +745,7 @@ watch(
                 />
               </div>
               <div>
-                <div class="text-sm mb-1 text-[var(--color-text-secondary)]">排序依据</div>
+                <span class="field-label">排序依据</span>
                 <NSelect
                   v-model:value="output.sort_by"
                   :options="sortOptions"
@@ -744,11 +753,12 @@ watch(
                 />
               </div>
               <div>
-                <div class="text-sm mb-1 text-[var(--color-text-secondary)]">排序方向</div>
+                <span class="field-label">排序方向</span>
                 <NSpace align="center" :size="8">
                   <NTag
                     size="small"
                     :type="output.sort_order === 'desc' ? 'error' : 'default'"
+                    :bordered="false"
                     class="cursor-pointer"
                     @click="output.sort_order = 'desc'"
                   >
@@ -757,6 +767,7 @@ watch(
                   <NTag
                     size="small"
                     :type="output.sort_order === 'asc' ? 'success' : 'default'"
+                    :bordered="false"
                     class="cursor-pointer"
                     @click="output.sort_order = 'asc'"
                   >
@@ -768,15 +779,249 @@ watch(
           </NCollapseItem>
         </NCollapse>
 
-        <NDivider />
-
-        <!-- Section 5: Live YAML Preview -->
-        <NCollapse arrow-placement="left">
-          <NCollapseItem title="YAML 预览">
-            <pre class="text-xs font-mono p-4 bg-[var(--color-surface-inset)] rounded-lg overflow-auto max-h-[400px] whitespace-pre text-[var(--color-text-primary)]">{{ yamlPreview }}</pre>
-          </NCollapseItem>
-        </NCollapse>
+        <!-- YAML live preview -->
+        <section class="flex flex-col gap-2">
+          <span class="section-label">实时预览</span>
+          <div class="glass-panel yaml-preview">
+            <pre class="yaml-preview__code">{{ yamlPreview }}</pre>
+          </div>
+        </section>
       </template>
     </div>
   </NSpin>
 </template>
+
+<style scoped>
+/* === Section labels === */
+.section-label {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}
+
+.field-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  margin-bottom: 6px;
+}
+
+/* === Action bar === */
+.action-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.action-bar__left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.action-bar__right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Mode toggle button */
+.mode-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--color-text-secondary);
+  transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease;
+}
+
+.mode-toggle:hover {
+  border-color: var(--color-accent);
+  color: var(--color-text-primary);
+}
+
+.mode-toggle--raw {
+  border-color: var(--color-accent);
+  background: var(--color-accent-muted);
+  color: var(--color-accent);
+}
+
+.mode-toggle__dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-border-muted);
+  transition: background-color 0.15s ease;
+}
+
+.mode-toggle--raw .mode-toggle__dot {
+  background: var(--color-accent);
+}
+
+.mode-toggle__label {
+  line-height: 1;
+}
+
+/* === Collapse header pattern === */
+.collapse-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.collapse-header__label {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}
+
+.collapse-header__title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+/* Weight status badge in factor header */
+.weight-status {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.weight-status--ok {
+  color: var(--color-success);
+  background: rgba(34, 197, 94, 0.1);
+}
+
+.weight-status--warn {
+  color: var(--color-warning);
+  background: rgba(245, 158, 11, 0.1);
+}
+
+/* === Universe rows === */
+.universe-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.universe-row:last-child {
+  border-bottom: none;
+}
+
+.universe-row__label {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+/* === Factor panel + rows === */
+.factor-panel {
+  padding: 4px 0;
+}
+
+.factor-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--color-border);
+  transition: background-color 0.12s ease, opacity 0.2s ease;
+}
+
+.factor-row:hover {
+  background: var(--color-glass-highlight);
+}
+
+.factor-row--last {
+  border-bottom: none;
+}
+
+.factor-row--disabled {
+  opacity: 0.35;
+}
+
+.factor-row__info {
+  width: 120px;
+  flex-shrink: 0;
+}
+
+.factor-row__name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  line-height: 1.3;
+}
+
+/* === Filter rows === */
+.filter-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.filter-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.filter-row--last {
+  border-bottom: none;
+  padding-bottom: 12px;
+}
+
+.filter-row__text {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.filter-row__unit {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+/* === YAML preview === */
+.yaml-preview {
+  overflow: hidden;
+}
+
+.yaml-preview__code {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  padding: 16px 20px;
+  margin: 0;
+  background: var(--color-surface-inset);
+  overflow: auto;
+  max-height: 400px;
+  white-space: pre;
+  color: var(--color-text-primary);
+  line-height: 1.6;
+}
+
+/* === Raw mode YAML editor === */
+.yaml-editor :deep(textarea) {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+}
+</style>

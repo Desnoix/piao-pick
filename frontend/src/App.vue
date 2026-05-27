@@ -5,9 +5,8 @@ import {
   NDialogProvider,
   NNotificationProvider,
   NLoadingBarProvider,
-  NTooltip,
 } from 'naive-ui'
-import { computed, ref, onMounted, type Component, markRaw } from 'vue'
+import { computed, onMounted, type Component, markRaw } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAppStore } from './stores/app'
 import {
@@ -19,13 +18,11 @@ import {
   PhGearSix,
   PhSun,
   PhMoon,
-  PhSidebar,
 } from '@phosphor-icons/vue'
 
 const router = useRouter()
 const route = useRoute()
 const appStore = useAppStore()
-const sidebarCollapsed = ref(false)
 
 interface NavItem {
   label: string
@@ -87,19 +84,19 @@ function navigateTo(path: string) {
   router.push(path)
 }
 
-const breadcrumbs = computed(() => {
+const pageTitle = computed(() => {
   const path = route.path
-  if (path === '/dashboard' || path === '/') return ['概览']
-  if (path === '/selection') return ['选股']
-  if (path === '/strategy/list') return ['策略']
-  if (path === '/strategy/compare') return ['策略', '对比']
-  if (path.startsWith('/strategy/')) return ['策略', '编辑']
-  if (path.startsWith('/stock/')) return ['选股', '个股详情']
-  if (path === '/backtest') return ['回测']
-  if (path.startsWith('/backtest/')) return ['回测', '结果']
-  if (path === '/data/status') return ['数据']
-  if (path === '/settings') return ['设置']
-  return []
+  if (path === '/' || path === '/dashboard') return '概览'
+  if (path === '/selection') return '选股'
+  if (path === '/strategy/list') return '策略管理'
+  if (path === '/strategy/compare') return '策略对比'
+  if (path.startsWith('/strategy/')) return '策略编辑'
+  if (path.startsWith('/stock/')) return '个股详情'
+  if (path === '/backtest') return '回测'
+  if (path.startsWith('/backtest/')) return '回测结果'
+  if (path === '/data/status') return '数据状态'
+  if (path === '/settings') return '设置'
+  return ''
 })
 
 onMounted(() => {
@@ -115,97 +112,44 @@ onMounted(() => {
         <NNotificationProvider>
           <NLoadingBarProvider>
             <div class="app-shell">
-              <!-- Sidebar -->
-              <aside
-                class="sidebar"
-                :class="{ 'sidebar--collapsed': sidebarCollapsed }"
-              >
-                <!-- Logo area -->
-                <div class="sidebar__brand">
+              <!-- Icon Rail -->
+              <aside class="rail" aria-label="主导航">
+                <!-- Brand -->
+                <div class="rail__brand">
                   <PhChartLineUp
                     :size="22"
                     weight="bold"
-                    class="sidebar__logo-icon"
+                    class="rail__brand-icon"
                   />
-                  <Transition name="fade-text">
-                    <div v-if="!sidebarCollapsed" class="sidebar__brand-text">
-                      <span class="sidebar__title">飘票选股</span>
-                      <span class="sidebar__subtitle">多因子量化</span>
-                    </div>
-                  </Transition>
+                  <span class="rail__brand-text">飘票选股</span>
                 </div>
 
-                <!-- Nav items -->
-                <nav class="sidebar__nav" aria-label="主导航">
-                  <template v-for="item in navItems" :key="item.path">
-                    <NTooltip
-                      v-if="sidebarCollapsed"
-                      placement="right"
-                      :show-arrow="false"
-                    >
-                      <template #trigger>
-                        <button
-                          class="nav-item"
-                          :class="{ 'nav-item--active': isNavItemActive(item) }"
-                          :aria-label="item.label"
-                          @click="navigateTo(item.path)"
-                        >
-                          <component
-                            :is="item.icon"
-                            :size="20"
-                            :weight="isNavItemActive(item) ? 'fill' : 'regular'"
-                          />
-                        </button>
-                      </template>
-                      {{ item.label }}
-                    </NTooltip>
-                    <button
-                      v-else
-                      class="nav-item"
-                      :class="{ 'nav-item--active': isNavItemActive(item) }"
-                      :aria-label="item.label"
-                      @click="navigateTo(item.path)"
-                    >
-                      <component
-                        :is="item.icon"
-                        :size="20"
-                        :weight="isNavItemActive(item) ? 'fill' : 'regular'"
-                      />
-                      <span class="nav-item__label">{{ item.label }}</span>
-                    </button>
-                  </template>
+                <!-- Nav -->
+                <nav class="rail__nav">
+                  <button
+                    v-for="item in navItems"
+                    :key="item.path"
+                    class="rail__item"
+                    :class="{ 'rail__item--active': isNavItemActive(item) }"
+                    :aria-label="item.label"
+                    @click="navigateTo(item.path)"
+                  >
+                    <component
+                      :is="item.icon"
+                      :size="20"
+                      :weight="isNavItemActive(item) ? 'fill' : 'regular'"
+                      class="rail__item-icon"
+                    />
+                    <span class="rail__item-label">{{ item.label }}</span>
+                  </button>
                 </nav>
-
-                <!-- Footer -->
-                <div class="sidebar__footer">
-                  <span class="sidebar__version">v0.1.0</span>
-                </div>
               </aside>
 
               <!-- Main area -->
               <div class="main-area">
                 <!-- Header -->
                 <header class="app-header">
-                  <!-- Left: collapse toggle + breadcrumbs -->
-                  <div class="app-header__left">
-                    <button
-                      class="header-icon-btn"
-                      aria-label="切换侧边栏"
-                      @click="sidebarCollapsed = !sidebarCollapsed"
-                    >
-                      <PhSidebar :size="18" weight="regular" />
-                    </button>
-                    <nav class="breadcrumbs" aria-label="面包屑">
-                      <template v-for="(crumb, i) in breadcrumbs" :key="i">
-                        <span
-                          v-if="i > 0"
-                          class="breadcrumbs__sep"
-                          aria-hidden="true"
-                        >/</span>
-                        <span class="breadcrumbs__item">{{ crumb }}</span>
-                      </template>
-                    </nav>
-                  </div>
+                  <h1 class="app-header__title">{{ pageTitle }}</h1>
 
                   <!-- Right: status + theme + avatar -->
                   <div class="app-header__right">
@@ -257,158 +201,161 @@ onMounted(() => {
   overflow: hidden;
 }
 
-/* ========== Sidebar ========== */
-.sidebar {
-  width: 220px;
-  min-width: 220px;
+/* ============================================================
+   Icon Rail — 60px fixed, expands to 220px on hover (overlay)
+   The rail itself stays 60px in flex layout; a ::before backdrop
+   expands behind nav items, which overflow visibly to the right.
+   ============================================================ */
+
+.rail {
+  position: relative;
+  z-index: 50;
+  width: 60px;
+  min-width: 60px;
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  background: var(--color-surface-elevated);
-  border-right: 1px solid var(--color-border);
-  transition: width 0.2s ease, min-width 0.2s ease;
-  overflow: hidden;
+  overflow: visible;
   user-select: none;
 }
 
-.sidebar--collapsed {
+/* Expanding backdrop panel — provides background for overflow items */
+.rail::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
   width: 60px;
-  min-width: 60px;
+  background: var(--color-surface-elevated);
+  border-right: 1px solid var(--color-glass-border, var(--color-border));
+  transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.3s ease;
+  z-index: 0;
 }
 
-/* Brand / Logo */
-.sidebar__brand {
+.rail:hover::before {
+  width: 220px;
+  box-shadow: 8px 0 32px -8px rgba(0, 0, 0, 0.5);
+}
+
+/* ---- Brand area ---- */
+.rail__brand {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 16px;
-  border-bottom: 1px solid var(--color-border);
-  min-height: 56px;
+  gap: 12px;
+  height: 52px;
+  padding: 0 20px;
+  flex-shrink: 0;
 }
 
-.sidebar--collapsed .sidebar__brand {
-  justify-content: center;
-  padding: 16px 0;
-}
-
-.sidebar__logo-icon {
+.rail__brand-icon {
   color: var(--color-accent);
   flex-shrink: 0;
 }
 
-.sidebar__brand-text {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  white-space: nowrap;
-}
-
-.sidebar__title {
-  font-size: 15px;
+.rail__brand-text {
+  font-size: 14px;
   font-weight: 700;
   letter-spacing: -0.02em;
   color: var(--color-text-primary);
-  line-height: 1.2;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.15s ease 0.1s;
 }
 
-.sidebar__subtitle {
-  font-size: 11px;
-  color: var(--color-text-muted);
-  line-height: 1.2;
-  margin-top: 1px;
+.rail:hover .rail__brand-text {
+  opacity: 1;
 }
 
-/* Navigation */
-.sidebar__nav {
+/* ---- Nav ---- */
+.rail__nav {
+  position: relative;
+  z-index: 1;
   flex: 1;
-  overflow-y: auto;
-  padding: 8px;
   display: flex;
   flex-direction: column;
   gap: 2px;
-}
-
-.sidebar--collapsed .sidebar__nav {
-  align-items: center;
   padding: 8px 0;
+  overflow: visible;
 }
 
-/* Nav item */
-.nav-item {
+/* Nav item — base width equals rail width (60px) */
+.rail__item {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 9px 12px;
-  border-radius: 8px;
+  gap: 12px;
+  height: 40px;
+  width: 60px;
+  padding: 0 20px;
   border: none;
-  border-left: 3px solid transparent;
+  border-radius: 8px;
   background: transparent;
   color: var(--color-text-secondary);
   cursor: pointer;
-  font-size: 13px;
   font-family: inherit;
+  font-size: 13px;
   text-align: left;
-  transition: background-color 0.15s ease, color 0.15s ease,
-    border-color 0.15s ease;
-  position: relative;
+  transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+    background-color 0.15s ease,
+    color 0.15s ease;
 }
 
-.sidebar--collapsed .nav-item {
-  justify-content: center;
-  padding: 10px;
-  width: 40px;
-  border-left: none;
-  border-radius: 10px;
+.rail:hover .rail__item {
+  width: 204px;
 }
 
-.nav-item:hover {
+.rail__item:hover {
   background: var(--color-surface-inset);
   color: var(--color-text-primary);
 }
 
-.nav-item--active {
-  border-left-color: var(--color-accent);
-  background: var(--color-accent-muted);
-  color: var(--color-text-primary);
-  font-weight: 600;
-}
-
-.sidebar--collapsed .nav-item--active {
-  border-left: none;
-  background: var(--color-accent-muted);
-}
-
-.nav-item--active .nav-item__label {
+/* Active: tinted bg + gradient accent bar */
+.rail__item--active {
+  background: rgba(6, 182, 212, 0.08);
   color: var(--color-text-primary);
 }
 
-.nav-item--active:hover {
-  background: var(--color-accent-muted);
+.rail__item--active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--color-accent), var(--color-accent-hover));
 }
 
-.nav-item__label {
+.rail__item--active:hover {
+  background: rgba(6, 182, 212, 0.12);
+}
+
+/* Nav icon — always visible */
+.rail__item-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+/* Nav label — fades in on hover */
+.rail__item-label {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  opacity: 0;
+  transition: opacity 0.15s ease 0.1s;
 }
 
-/* Footer */
-.sidebar__footer {
-  padding: 12px 16px;
-  border-top: 1px solid var(--color-border);
-  text-align: left;
+.rail__item--active .rail__item-label {
+  font-weight: 600;
 }
 
-.sidebar--collapsed .sidebar__footer {
-  text-align: center;
-  padding: 12px 0;
-}
-
-.sidebar__version {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  color: var(--color-text-muted);
+.rail:hover .rail__item-label {
+  opacity: 1;
 }
 
 /* ========== Main Area ========== */
@@ -422,20 +369,23 @@ onMounted(() => {
 
 /* ========== Header ========== */
 .app-header {
-  height: 48px;
-  min-height: 48px;
+  height: 52px;
+  min-height: 52px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 16px;
+  padding: 0 24px;
   background: var(--color-surface-elevated);
+  border-bottom: 1px solid var(--color-glass-border, var(--color-border));
 }
 
-.app-header__left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
+.app-header__title {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--color-text-primary);
+  margin: 0;
+  line-height: 1;
 }
 
 .app-header__right {
@@ -463,31 +413,6 @@ onMounted(() => {
 .header-icon-btn:hover {
   background: var(--color-surface-inset);
   color: var(--color-text-primary);
-}
-
-/* Breadcrumbs */
-.breadcrumbs {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 13px;
-  min-width: 0;
-  overflow: hidden;
-}
-
-.breadcrumbs__item {
-  color: var(--color-text-secondary);
-  white-space: nowrap;
-}
-
-.breadcrumbs__item:last-child {
-  color: var(--color-text-primary);
-  font-weight: 500;
-}
-
-.breadcrumbs__sep {
-  color: var(--color-text-muted);
-  font-size: 12px;
 }
 
 /* Sync status indicator */
@@ -537,17 +462,6 @@ onMounted(() => {
 
 .content-inner {
   max-width: 1600px;
-  min-height: calc(100dvh - 48px - 48px);
-}
-
-/* ========== Transitions ========== */
-.fade-text-enter-active,
-.fade-text-leave-active {
-  transition: opacity 0.15s ease;
-}
-
-.fade-text-enter-from,
-.fade-text-leave-to {
-  opacity: 0;
+  min-height: calc(100dvh - 52px - 48px);
 }
 </style>

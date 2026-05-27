@@ -29,6 +29,13 @@
   --color-up-bg: rgba(239, 68, 68, 0.12);
   --color-down-bg: rgba(34, 197, 94, 0.12);
 
+  /* Surface hierarchy - deeper depth levels */
+  --color-surface-sunken: #070B12;
+
+  /* Glass panel premium treatment */
+  --color-glass-border: rgba(255, 255, 255, 0.06);
+  --color-glass-highlight: rgba(255, 255, 255, 0.03);
+
   /* Status colors */
   --color-warning: #F59E0B;
   --color-error: #EF4444;
@@ -51,6 +58,9 @@
   --color-accent: #06B6D4;
   --color-accent-hover: #22D3EE;
   --color-accent-muted: rgba(6, 182, 212, 0.12);
+  --color-surface-sunken: #070B12;
+  --color-glass-border: rgba(255, 255, 255, 0.06);
+  --color-glass-highlight: rgba(255, 255, 255, 0.03);
 }
 
 /* Light mode activated by removing .dark class */
@@ -68,6 +78,9 @@ html:not(.dark) {
   --color-accent-muted: rgba(8, 145, 178, 0.08);
   --color-up-bg: #FEF2F2;
   --color-down-bg: #F0FDF4;
+  --color-surface-sunken: #F1F5F9;
+  --color-glass-border: rgba(0, 0, 0, 0.06);
+  --color-glass-highlight: rgba(255, 255, 255, 0.6);
 }
 
 * {
@@ -214,11 +227,17 @@ button:active:not(:disabled),
 
 /* ===== Dark-tech utility classes ===== */
 
-/* Glass panel: elevated surface with border, rounded corners */
+/* Glass panel: elevated surface with premium depth treatment */
 .glass-panel {
   background: var(--color-surface-elevated);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-glass-border, var(--color-border));
   border-radius: 12px;
+  box-shadow: 0 0 0 1px var(--color-glass-highlight, transparent);
+}
+
+/* Accent gradient: brand-colored fills for badges, bars, decorative elements */
+.accent-gradient {
+  background: linear-gradient(135deg, var(--color-accent), var(--color-accent-hover));
 }
 
 /* Monospaced tabular numbers for financial data */

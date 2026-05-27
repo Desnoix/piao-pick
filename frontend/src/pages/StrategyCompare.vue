@@ -300,72 +300,135 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="flex flex-col gap-6">
-    <div class="flex items-center justify-between">
-      <h2 class="text-xl font-bold text-[var(--color-text-primary)]">策略对比</h2>
-    </div>
-
-    <!-- Strategy Selector -->
-    <div class="glass-panel p-5 flex items-end gap-3 flex-wrap">
-      <div class="flex-1 min-w-[300px]">
-        <div class="text-sm mb-1 text-[var(--color-text-secondary)]">选择策略 (2-4个)</div>
-        <NSelect
-          v-model:value="selectedIds"
-          :options="strategyOptions"
-          multiple
-          :max-tag-count="4"
-          placeholder="选择要对比的策略"
-          :filterable="true"
-        />
+  <div class="flex flex-col gap-8">
+    <!-- Strategy Selector Section -->
+    <section>
+      <span class="section-label">对比设置</span>
+      <div class="glass-panel p-5 mt-3 flex items-end gap-3 flex-wrap">
+        <div class="flex-1 min-w-[300px]">
+          <div class="select-hint">选择策略 (2-4个)</div>
+          <NSelect
+            v-model:value="selectedIds"
+            :options="strategyOptions"
+            multiple
+            :max-tag-count="4"
+            placeholder="选择要对比的策略"
+            :filterable="true"
+          />
+        </div>
+        <NButton
+          type="primary"
+          :disabled="selectedIds.length < 2"
+          @click="runCompare"
+        >
+          运行对比
+        </NButton>
       </div>
-      <NButton
-        type="primary"
-        :disabled="selectedIds.length < 2"
-        @click="runCompare"
-      >
-        运行对比
-      </NButton>
-    </div>
+    </section>
 
-    <NAlert v-if="selectedIds.length < 2" type="info">
+    <!-- Hint when not enough strategies selected -->
+    <div v-if="selectedIds.length < 2" class="hint-banner">
+      <span class="hint-dot" />
       请选择至少 2 个策略进行对比
-    </NAlert>
+    </div>
 
     <NSpin :show="loadingData">
       <template v-if="compareData.length > 0">
-        <!-- NAV Curve Chart -->
-        <div class="glass-panel p-5">
-          <div class="flex items-center justify-between mb-2">
-            <h3 class="text-lg font-bold text-[var(--color-text-primary)]">净值曲线对比</h3>
-            <div class="flex items-center gap-2">
-              <span class="text-sm text-[var(--color-text-secondary)]">对数坐标</span>
-              <NSwitch v-model:value="logScale" size="small" />
+        <div class="flex flex-col gap-8">
+          <!-- NAV Curve -->
+          <section>
+            <div class="flex items-center justify-between mb-3">
+              <span class="section-label">净值曲线</span>
+              <div class="toggle-group">
+                <span class="toggle-label">对数坐标</span>
+                <NSwitch v-model:value="logScale" size="small" />
+              </div>
             </div>
-          </div>
-          <NavCurveChart :series="navSeriesData" :log-scale="logScale" :height="420" />
-        </div>
+            <div class="glass-panel p-5">
+              <NavCurveChart :series="navSeriesData" :log-scale="logScale" :height="420" />
+            </div>
+          </section>
 
-        <!-- Metrics Table -->
-        <div class="glass-panel p-5">
-          <h3 class="text-lg font-bold mb-2 text-[var(--color-text-primary)]">指标对比</h3>
-          <NDataTable
-            :columns="dynamicColumns"
-            :data="tableData"
-            size="small"
-            striped
-            :bordered="true"
-          />
-          <div class="text-xs text-[var(--color-text-muted)] mt-1">红色高亮表示该指标最优</div>
-        </div>
+          <!-- Metrics Table -->
+          <section>
+            <span class="section-label">指标对比</span>
+            <div class="glass-panel p-5 mt-3 overflow-hidden">
+              <NDataTable
+                :columns="dynamicColumns"
+                :data="tableData"
+                size="small"
+                striped
+                :bordered="true"
+              />
+              <div class="metrics-note">红色高亮表示该指标最优</div>
+            </div>
+          </section>
 
-        <!-- Factor Composition Diff -->
-        <div class="glass-panel p-5">
-          <h3 class="text-lg font-bold mb-2 text-[var(--color-text-primary)]">因子构成分布</h3>
-          <div class="w-full h-[300px]">
-            <VChart :option="factorBarOption" autoresize />
-          </div>
+          <!-- Factor Composition -->
+          <section>
+            <span class="section-label">因子构成</span>
+            <div class="glass-panel p-5 mt-3">
+              <div class="w-full h-[300px]">
+                <VChart :option="factorBarOption" autoresize />
+              </div>
+            </div>
+          </section>
         </div>
       </template>
     </NSpin>
   </div>
 </template>
+
+<style scoped>
+.section-label {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}
+
+.select-hint {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-bottom: 6px;
+}
+
+.hint-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.hint-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  flex-shrink: 0;
+}
+
+.toggle-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toggle-label {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.metrics-note {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-glass-highlight);
+}
+</style>

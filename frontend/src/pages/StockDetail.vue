@@ -13,7 +13,7 @@ import FinancialTrend from '../components/FinancialTrend.vue'
 import { useStockDetail } from '../composables/use-stock-detail'
 import { useChartTheme } from '../composables/use-chart-theme'
 import { FACTOR_LABELS, FACTOR_CATEGORIES } from '../utils/constants'
-import { PhHouse } from '@phosphor-icons/vue'
+import { PhHouse, PhArrowLeft } from '@phosphor-icons/vue'
 
 const props = defineProps<{
   ts_code: string
@@ -74,37 +74,26 @@ const lastKline = computed(() => {
 
 <template>
   <NSpin :show="loading" class="min-h-[60vh]">
-    <!-- Breadcrumb navigation -->
-    <div class="flex items-center gap-2 text-sm mb-4">
-      <router-link
-        to="/"
-        class="flex items-center gap-1.5 text-[var(--color-accent)] hover:text-[var(--color-accent-hover)] transition-colors"
-      >
-        <PhHouse :size="14" />
-        <span>概览</span>
-      </router-link>
-      <span class="text-[var(--color-text-muted)]">/</span>
-      <router-link
-        to="/selection"
-        class="text-[var(--color-accent)] hover:text-[var(--color-accent-hover)] transition-colors"
-      >
-        选股
-      </router-link>
-      <span class="text-[var(--color-text-muted)]">/</span>
-      <span class="text-[var(--color-text-secondary)]">
-        {{ stockInfo?.name || ts_code }}
-      </span>
+    <!-- Back navigation -->
+    <router-link
+      v-if="stockInfo"
+      to="/selection"
+      class="inline-flex items-center gap-1.5 text-[13px] text-[var(--color-text-muted)] hover:text-[var(--color-accent)] transition-colors mb-2"
+    >
+      <PhArrowLeft :size="14" />
+      <span>返回选股</span>
+    </router-link>
+
+    <!-- Error state: left-border pattern -->
+    <div v-if="error && !stockInfo" class="error-banner mb-6">
+      <div class="error-bar"></div>
+      <div class="error-body">
+        <p class="error-msg">{{ error }}</p>
+        <NButton size="small" @click="reload">重新加载</NButton>
+      </div>
     </div>
 
-    <div v-if="error && !stockInfo" class="mb-4">
-      <NAlert type="error" :title="error">
-        <NButton size="small" class="mt-2" @click="reload">
-          重新加载
-        </NButton>
-      </NAlert>
-    </div>
-
-    <div v-if="stockInfo" class="flex flex-col gap-6">
+    <div v-if="stockInfo" class="flex flex-col gap-8">
       <!-- Stock Header -->
       <StockHeader
         :name="stockInfo.name || '未知'"
@@ -115,107 +104,101 @@ const lastKline = computed(() => {
       />
 
       <!-- Main Grid: K-line (2/3) + Factor sidebar (1/3) -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <!-- K-line Chart -->
-        <div class="glass-panel lg:col-span-2 p-5">
-          <div class="flex items-center justify-between mb-4">
-            <h3 class="text-sm font-semibold text-[var(--color-text-primary)]">
-              K线走势
-            </h3>
-            <NTag v-if="mockKline" size="small" type="warning" :bordered="false">
-              示例数据
-            </NTag>
+        <div class="lg:col-span-2 flex flex-col gap-2.5">
+          <div class="flex items-center justify-between px-1">
+            <span class="section-label">价格走势</span>
+            <span v-if="mockKline" class="mock-tag">示例数据</span>
           </div>
-          <KLineChart :data="klines" />
+          <div class="glass-panel p-5">
+            <KLineChart :data="klines" />
+          </div>
         </div>
 
         <!-- Factor Sidebar -->
-        <div class="flex flex-col gap-4 lg:gap-6">
+        <div class="flex flex-col gap-6">
           <!-- Factor Radar -->
-          <div class="glass-panel p-5">
-            <div class="flex items-center justify-between mb-2">
-              <h3 class="text-sm font-semibold text-[var(--color-text-primary)]">
-                因子画像
-              </h3>
-              <NTag v-if="mockFactors" size="small" type="warning" :bordered="false">
-                示例数据
-              </NTag>
+          <div class="flex flex-col gap-2.5">
+            <div class="flex items-center justify-between px-1">
+              <span class="section-label">因子画像</span>
+              <span v-if="mockFactors" class="mock-tag">示例数据</span>
             </div>
-            <FactorRadar :factors="factorSnapshot" :theme="theme" />
+            <div class="glass-panel p-5">
+              <FactorRadar :factors="factorSnapshot" :theme="theme" />
+            </div>
           </div>
 
           <!-- Factor Metrics List -->
-          <div class="glass-panel p-5">
-            <h3 class="text-sm font-semibold text-[var(--color-text-primary)] mb-3">
-              因子评分
-            </h3>
-            <div
-              v-if="factorEntries.length === 0"
-              class="text-sm text-[var(--color-text-muted)] py-4 text-center"
-            >
-              暂无因子数据
-            </div>
-            <div v-else class="flex flex-col gap-1">
-              <template v-for="cat in Object.keys(FACTOR_CATEGORIES)" :key="cat">
-                <div class="flex items-center gap-2 mt-3 mb-1.5 first:mt-0">
-                  <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-[var(--color-accent-muted)] text-[var(--color-accent)]">
-                    {{ categoryLabels[cat] || cat }}
-                  </span>
-                </div>
-                <div
-                  v-for="entry in factorEntries.filter((e) => e.category === cat)"
-                  :key="entry.key"
-                  class="flex items-center gap-2 py-1"
-                >
-                  <span class="text-xs text-[var(--color-text-secondary)] w-16 shrink-0 truncate">
-                    {{ entry.label }}
-                  </span>
-                  <div class="flex-1 h-1.5 bg-[var(--color-border)] rounded-full overflow-hidden">
-                    <div
-                      class="h-full rounded-full transition-all"
-                      :style="[getBarStyle(entry.value), { width: `${entry.value}%` }]"
-                    />
+          <div class="flex flex-col gap-2.5">
+            <span class="section-label px-1">因子评分</span>
+            <div class="glass-panel p-5">
+              <div
+                v-if="factorEntries.length === 0"
+                class="text-sm text-[var(--color-text-muted)] py-6 text-center"
+              >
+                暂无因子数据
+              </div>
+              <div v-else class="flex flex-col">
+                <template v-for="cat in Object.keys(FACTOR_CATEGORIES)" :key="cat">
+                  <div class="flex items-center gap-2 mt-3 mb-2 first:mt-0">
+                    <span class="category-badge">
+                      {{ categoryLabels[cat] || cat }}
+                    </span>
                   </div>
-                  <span class="text-xs data-mono text-[var(--color-text-secondary)] w-8 text-right">
-                    {{ entry.value }}
-                  </span>
-                </div>
-              </template>
+                  <div
+                    v-for="entry in factorEntries.filter((e) => e.category === cat)"
+                    :key="entry.key"
+                    class="factor-row"
+                  >
+                    <span class="factor-label">
+                      {{ entry.label }}
+                    </span>
+                    <div class="factor-bar-track">
+                      <div
+                        class="factor-bar-fill"
+                        :style="[getBarStyle(entry.value), { width: `${entry.value}%` }]"
+                      />
+                    </div>
+                    <span class="factor-value">
+                      {{ entry.value }}
+                    </span>
+                  </div>
+                </template>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Below Grid: Financial Trend + Factor History -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
-        <div class="glass-panel p-5">
-          <div class="flex items-center justify-between mb-2">
-            <h3 class="text-sm font-semibold text-[var(--color-text-primary)]">
-              财务趋势
-            </h3>
-            <NTag size="small" type="warning" :bordered="false">示例数据</NTag>
+      <!-- Lower Grid: Financial Trend + Factor History -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="flex flex-col gap-2.5">
+          <div class="flex items-center justify-between px-1">
+            <span class="section-label">财务趋势</span>
+            <span class="mock-tag">示例数据</span>
           </div>
-          <FinancialTrend
-            :quarters="financialTrend.quarters"
-            :rev-growth="financialTrend.revGrowth"
-            :ear-growth="financialTrend.earGrowth"
-            :gross-margin="financialTrend.grossMargin"
-          />
+          <div class="glass-panel p-5">
+            <FinancialTrend
+              :quarters="financialTrend.quarters"
+              :rev-growth="financialTrend.revGrowth"
+              :ear-growth="financialTrend.earGrowth"
+              :gross-margin="financialTrend.grossMargin"
+            />
+          </div>
         </div>
 
-        <div class="glass-panel p-5">
-          <div class="flex items-center justify-between mb-2">
-            <h3 class="text-sm font-semibold text-[var(--color-text-primary)]">
-              因子历史
-            </h3>
-            <NTag v-if="mockFactors" size="small" type="warning" :bordered="false">
-              示例数据
-            </NTag>
+        <div class="flex flex-col gap-2.5">
+          <div class="flex items-center justify-between px-1">
+            <span class="section-label">因子历史</span>
+            <span v-if="mockFactors" class="mock-tag">示例数据</span>
           </div>
-          <FactorHistory
-            :dates="factorHistory.dates"
-            :factors="factorHistory.factors"
-          />
+          <div class="glass-panel p-5">
+            <FactorHistory
+              :dates="factorHistory.dates"
+              :factors="factorHistory.factors"
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -225,13 +208,131 @@ const lastKline = computed(() => {
       v-if="!loading && !stockInfo && !error"
       class="flex flex-col items-center justify-center py-20"
     >
-      <div class="text-5xl mb-4 opacity-40 text-[var(--color-text-muted)]">&#x2139;</div>
-      <div class="text-base text-[var(--color-text-secondary)] mb-1">
+      <div class="empty-icon-ring">
+        <PhArrowLeft :size="22" class="text-[var(--color-text-muted)]" />
+      </div>
+      <div class="text-sm text-[var(--color-text-secondary)] mb-1">
         未找到股票数据
       </div>
-      <div class="text-sm text-[var(--color-text-muted)]">
+      <div class="text-xs text-[var(--color-text-muted)]">
         请检查股票代码是否正确
       </div>
     </div>
   </NSpin>
 </template>
+
+<style scoped>
+.section-label {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}
+
+.mock-tag {
+  font-size: 10px;
+  font-weight: 500;
+  padding: 1px 6px;
+  border-radius: 4px;
+  color: var(--color-warning);
+  background: rgba(245, 158, 11, 0.08);
+  letter-spacing: 0.02em;
+}
+
+/* Error banner: left-border accent pattern */
+.error-banner {
+  display: flex;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--color-surface-elevated);
+  border: 1px solid rgba(239, 68, 68, 0.15);
+}
+.error-bar {
+  width: 4px;
+  flex-shrink: 0;
+  background: var(--color-error);
+}
+.error-body {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px;
+  background: rgba(239, 68, 68, 0.04);
+}
+.error-msg {
+  font-size: 13px;
+  color: var(--color-error);
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Factor category badge */
+.category-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  background: var(--color-accent-muted);
+  color: var(--color-accent);
+}
+
+/* Factor row: subtle divider between entries */
+.factor-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--color-glass-highlight);
+}
+.factor-row:last-child {
+  border-bottom: none;
+}
+.factor-label {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  width: 60px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.factor-bar-track {
+  flex: 1;
+  height: 4px;
+  background: var(--color-border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.factor-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.factor-value {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-secondary);
+  width: 28px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* Empty state icon ring */
+.empty-icon-ring {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--color-surface-inset);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+  opacity: 0.4;
+}
+</style>
