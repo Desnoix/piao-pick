@@ -9,8 +9,11 @@ import {
   VisualMapComponent,
 } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
+import { useChartTheme } from '../../composables/use-chart-theme'
 
 use([HeatmapChart, TooltipComponent, GridComponent, VisualMapComponent, CanvasRenderer])
+
+const { theme, isDark } = useChartTheme()
 
 const props = defineProps<{
   data: Array<[number, number, number]>
@@ -18,10 +21,17 @@ const props = defineProps<{
 }>()
 
 const option = computed(() => {
+  const neutralBg = isDark.value ? '#1E293B' : '#F1F5F9'
+  
   return {
-    animation: false,
+    animation: true,
+    animationDuration: 600,
+    animationEasing: 'cubicOut' as const,
     tooltip: {
       position: 'top',
+      backgroundColor: theme.value.tooltip.backgroundColor,
+      borderColor: theme.value.tooltip.borderColor,
+      textStyle: theme.value.tooltip.textStyle,
       formatter: (params: any) => {
         const year = props.years[params.value[0]]
         const month = params.value[1] + 1
@@ -38,11 +48,15 @@ const option = computed(() => {
       type: 'category',
       data: props.years,
       splitArea: { show: true },
+      axisLine: { lineStyle: { color: theme.value.axisLine.lineStyle.color } },
+      axisLabel: { color: theme.value.axisLabel.color },
     },
     yAxis: {
       type: 'category',
       data: ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'],
       splitArea: { show: true },
+      axisLine: { lineStyle: { color: theme.value.axisLine.lineStyle.color } },
+      axisLabel: { color: theme.value.axisLabel.color },
     },
     visualMap: {
       min: -10,
@@ -51,8 +65,11 @@ const option = computed(() => {
       orient: 'vertical',
       right: 10,
       top: 'center',
+      textStyle: { color: theme.value.textStyle.color },
       inRange: {
-        color: ['#22C55E', '#86EFAC', '#FFFFFF', '#FCA5A5', '#EF4444'],
+        color: isDark.value
+          ? ['#166534', '#22C55E', neutralBg, '#EF4444', '#991B1B']
+          : ['#22C55E', '#86EFAC', neutralBg, '#FCA5A5', '#EF4444'],
       },
     },
     series: [
@@ -61,6 +78,7 @@ const option = computed(() => {
         data: props.data,
         label: {
           show: true,
+          color: theme.value.textStyle.color,
           formatter: (params: any) => {
             const val = params.value[2]
             return val.toFixed(1)

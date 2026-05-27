@@ -23,6 +23,7 @@ import {
 import { CanvasRenderer } from 'echarts/renderers'
 import NavCurveChart from '../components/charts/NavCurveChart.vue'
 import { useStrategyStore } from '../stores/strategy'
+import { useChartTheme } from '../composables/use-chart-theme'
 import { getStrategy } from '../api/strategies'
 import type { Strategy, NavSeries, FactorWeight } from '../types/strategy'
 import yaml from 'js-yaml'
@@ -32,17 +33,11 @@ use([BarChart, TooltipComponent, GridComponent, LegendComponent, CanvasRenderer]
 
 const route = useRoute()
 const strategyStore = useStrategyStore()
+const { theme } = useChartTheme()
 
 const selectedIds = ref<string[]>([])
 const loadingData = ref(false)
 const logScale = ref(false)
-
-const CHART_COLORS = [
-  '#3B82F6',
-  '#F59E0B',
-  '#8B5CF6',
-  '#EC4899',
-]
 
 interface StrategyCompareData {
   id: string
@@ -139,7 +134,7 @@ const dynamicColumns = computed(() => {
         return h(
           'span',
           {
-            class: `font-mono ${isBest ? 'text-red-500 font-bold' : ''}`,
+            class: `data-mono ${isBest ? 'text-[var(--color-up)] font-bold' : ''}`,
           },
           String(rec[d.id] ?? '')
         )
@@ -154,7 +149,7 @@ const navSeriesData = computed<NavSeries[]>(() => {
     name: d.name,
     dates: d.navSeries.dates,
     values: d.navSeries.values,
-    color: CHART_COLORS[i % CHART_COLORS.length],
+    color: theme.value.color[i % theme.value.color.length],
   }))
   series.push({
     name: '沪深300',
@@ -188,12 +183,16 @@ const factorBarOption = computed(() => {
     }),
   }))
 
-  return {
-    animation: false,
-    tooltip: {
-      trigger: 'axis',
-      axisPointer: { type: 'shadow' },
-      formatter: (params: Array<{ seriesName: string; data: number; color: string }>) => {
+    return {
+      animation: false,
+      color: theme.value.color,
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'shadow' },
+        backgroundColor: theme.value.tooltip.backgroundColor,
+        borderColor: theme.value.tooltip.borderColor,
+        textStyle: theme.value.tooltip.textStyle,
+        formatter: (params: Array<{ seriesName: string; data: number; color: string }>) => {
         if (!Array.isArray(params) || params.length === 0) return ''
         let html = `<strong>${params[0].seriesName}</strong><br/>`
         params.forEach((p: { seriesName: string; data: number; color: string }) => {
@@ -273,7 +272,7 @@ async function runCompare() {
           name: detail.display_name || detail.name || id,
           dates: mockDates,
           values: nav,
-          color: CHART_COLORS[i % CHART_COLORS.length],
+          color: theme.value.color[i % theme.value.color.length],
         },
       })
     }
@@ -307,7 +306,7 @@ onMounted(async () => {
     </div>
 
     <!-- Strategy Selector -->
-    <div class="flex items-end gap-3 flex-wrap">
+    <div class="glass-panel p-5 flex items-end gap-3 flex-wrap">
       <div class="flex-1 min-w-[300px]">
         <div class="text-sm mb-1 text-[var(--color-text-secondary)]">选择策略 (2-4个)</div>
         <NSelect
@@ -335,7 +334,7 @@ onMounted(async () => {
     <NSpin :show="loadingData">
       <template v-if="compareData.length > 0">
         <!-- NAV Curve Chart -->
-        <div class="border-t border-[var(--color-border)] pt-4">
+        <div class="glass-panel p-5">
           <div class="flex items-center justify-between mb-2">
             <h3 class="text-lg font-bold text-[var(--color-text-primary)]">净值曲线对比</h3>
             <div class="flex items-center gap-2">
@@ -347,7 +346,7 @@ onMounted(async () => {
         </div>
 
         <!-- Metrics Table -->
-        <div class="border-t border-[var(--color-border)] pt-4">
+        <div class="glass-panel p-5">
           <h3 class="text-lg font-bold mb-2 text-[var(--color-text-primary)]">指标对比</h3>
           <NDataTable
             :columns="dynamicColumns"
@@ -360,7 +359,7 @@ onMounted(async () => {
         </div>
 
         <!-- Factor Composition Diff -->
-        <div class="border-t border-[var(--color-border)] pt-4">
+        <div class="glass-panel p-5">
           <h3 class="text-lg font-bold mb-2 text-[var(--color-text-primary)]">因子构成分布</h3>
           <div class="w-full h-[300px]">
             <VChart :option="factorBarOption" autoresize />

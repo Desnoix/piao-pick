@@ -1,4 +1,8 @@
 <script setup lang="ts">
+/**
+ * Metric card: elevated panel with label, value, and trend indicator bar.
+ * 指标卡片: 提升面板带标签、数值和趋势指示条。
+ */
 import { computed } from 'vue'
 
 const props = defineProps<{
@@ -20,22 +24,18 @@ const valueColor = computed(() => {
   return 'var(--color-text-primary)'
 })
 
+/** Trend bar: success for positive, error for negative, accent for neutral */
 const trendBarColor = computed(() => {
-  if (props.trend === 'up') return 'var(--color-up)'
-  if (props.trend === 'down') return 'var(--color-down)'
+  if (props.trend === 'up') return 'var(--color-success)'
+  if (props.trend === 'down') return 'var(--color-error)'
+  if (props.trend === 'neutral') return 'var(--color-accent)'
   return 'transparent'
 })
 </script>
 
 <template>
   <div
-    class="relative overflow-hidden rounded-lg border transition-colors duration-150"
-    style="
-      background-color: var(--color-surface-elevated);
-      border-color: var(--color-border);
-    "
-    @mouseenter="($event.currentTarget as HTMLElement).style.borderColor = 'var(--color-border-muted)'"
-    @mouseleave="($event.currentTarget as HTMLElement).style.borderColor = 'var(--color-border)'"
+    class="glass-panel relative overflow-hidden"
   >
     <!-- Trend indicator bar -->
     <div
@@ -43,16 +43,10 @@ const trendBarColor = computed(() => {
       :style="{ backgroundColor: trendBarColor }"
     />
     <div class="p-4">
-      <div
-        class="text-xs mb-1.5"
-        style="color: var(--color-text-secondary)"
-      >
+      <div class="text-xs mb-1.5 text-[var(--color-text-secondary)]">
         {{ label }}
       </div>
-      <div
-        class="text-2xl font-bold font-mono"
-        :style="{ color: valueColor }"
-      >
+      <div class="text-2xl font-bold data-mono" :style="{ color: valueColor }">
         {{ displayValue }}
       </div>
     </div>

@@ -36,7 +36,7 @@ const columns: DataTableColumns<Strategy> = [
       return h(
         'a',
         {
-          class: 'text-blue-500 cursor-pointer hover:underline',
+          class: 'text-[var(--color-accent)] cursor-pointer hover:underline',
           onClick: () => router.push(`/strategy/${row.id}`),
         },
         row.display_name || row.name || row.id
@@ -67,7 +67,7 @@ const columns: DataTableColumns<Strategy> = [
     width: 80,
     sorter: (a, b) => a.priority - b.priority,
     render(row) {
-      return h('span', { class: 'font-mono' }, row.priority)
+      return h('span', { class: 'data-mono' }, row.priority)
     },
   },
   {
@@ -162,7 +162,7 @@ onMounted(() => {
         </NButton>
       </NSpace>
     </div>
-    <div class="rounded-lg border border-[var(--color-border)] overflow-hidden">
+    <div class="glass-panel overflow-hidden">
       <NDataTable
         :columns="columns"
         :data="strategyStore.strategies"

@@ -512,7 +512,7 @@ watch(
         <!-- Section 1: Universe Filters -->
         <NCollapse :default-expanded-names="['universe']" arrow-placement="left">
           <NCollapseItem title="选股池 (Universe)" name="universe">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="glass-panel p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
               <div class="flex flex-col gap-3">
                 <div class="flex items-center justify-between">
                   <span class="text-sm text-[var(--color-text-secondary)]">排除 ST 股票</span>
@@ -577,14 +577,14 @@ watch(
                 <NButton
                   v-if="!weightNormalized && enabledFactorCount > 0"
                   size="tiny"
-                  type="info"
+                  type="primary"
                   @click.stop="normalizeWeights"
                 >
                   自动归一
                 </NButton>
               </div>
             </template>
-            <div class="flex flex-col gap-2">
+            <div class="glass-panel p-4 flex flex-col gap-2">
               <div
                 v-for="factor in factors"
                 :key="factor.id"
@@ -653,7 +653,7 @@ watch(
         <!-- Section 3: Filters -->
         <NCollapse :default-expanded-names="['filters']" arrow-placement="left">
           <NCollapseItem title="过滤规则" name="filters">
-            <div class="flex flex-col gap-3">
+            <div class="glass-panel p-4 flex flex-col gap-3">
               <div
                 v-for="(filter, index) in filters"
                 :key="index"
@@ -717,7 +717,7 @@ watch(
         <!-- Section 4: Output -->
         <NCollapse :default-expanded-names="['output']" arrow-placement="left">
           <NCollapseItem title="输出设置" name="output">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="glass-panel p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <div class="text-sm mb-1 text-[var(--color-text-secondary)]">最大股票数</div>
                 <NInputNumber
@@ -766,7 +766,7 @@ watch(
         <!-- Section 5: Live YAML Preview -->
         <NCollapse arrow-placement="left">
           <NCollapseItem title="YAML 预览">
-            <pre class="text-xs font-mono p-4 bg-[var(--color-surface-inset)] border border-[var(--color-border)] rounded overflow-auto max-h-[400px] whitespace-pre text-[var(--color-text-primary)]">{{ yamlPreview }}</pre>
+            <pre class="text-xs font-mono p-4 bg-[var(--color-surface-inset)] rounded-lg overflow-auto max-h-[400px] whitespace-pre text-[var(--color-text-primary)]">{{ yamlPreview }}</pre>
           </NCollapseItem>
         </NCollapse>
       </template>

@@ -1,4 +1,8 @@
 <script setup lang="ts">
+/**
+ * Stock header: name, code, industry badge, price + pct change.
+ * 股票头部: 名称、代码、行业标签、价格与涨跌幅。
+ */
 import { formatPrice, formatPct, getPctColor } from '../../utils/format'
 
 defineProps<{
@@ -14,16 +18,10 @@ defineProps<{
   <div class="flex items-center gap-6 flex-wrap">
     <!-- Name + code -->
     <div class="flex items-baseline gap-3">
-      <h1
-        class="text-2xl font-bold leading-tight"
-        style="color: var(--color-text-primary)"
-      >
+      <h1 class="text-2xl font-bold leading-tight text-[var(--color-text-primary)]">
         {{ name }}
       </h1>
-      <span
-        class="text-sm font-mono"
-        style="color: var(--color-text-muted)"
-      >
+      <span class="text-sm data-mono text-[var(--color-text-muted)]">
         {{ ts_code }}
       </span>
     </div>
@@ -31,7 +29,7 @@ defineProps<{
     <!-- Industry badge -->
     <span
       v-if="industry"
-      class="px-3 py-1 rounded-md text-xs font-medium border"
+      class="inline-flex items-center px-3 py-1 rounded-md text-xs font-medium border"
       style="
         background-color: var(--color-surface-inset);
         color: var(--color-text-secondary);
@@ -46,14 +44,11 @@ defineProps<{
       v-if="close !== null && close !== undefined"
       class="ml-auto flex items-baseline gap-4"
     >
-      <div
-        class="text-2xl font-bold font-mono"
-        style="color: var(--color-text-primary)"
-      >
+      <div class="text-2xl font-bold data-mono text-[var(--color-text-primary)]">
         {{ formatPrice(close) }}
       </div>
       <div
-        class="text-lg font-mono font-semibold"
+        class="text-lg data-mono font-semibold"
         :class="getPctColor(pct_change)"
       >
         {{ formatPct(pct_change) }}

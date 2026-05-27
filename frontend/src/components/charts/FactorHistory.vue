@@ -10,24 +10,21 @@ import {
 } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 import { FACTOR_LABELS } from '../../utils/constants'
+import { useChartTheme } from '../../composables/use-chart-theme'
 
 use([LineChart, TooltipComponent, GridComponent, LegendComponent, CanvasRenderer])
+
+const { theme } = useChartTheme()
 
 const props = defineProps<{
   dates: string[]
   factors: Record<string, number[]>
 }>()
 
-const PALETTE = [
-  '#3B82F6', '#EF4444', '#22C55E', '#A78BFA',
-  '#F59E0B', '#EC4899', '#14B8A6', '#F97316',
-  '#6366F1', '#84CC16', '#06B6D4', '#E11D48',
-  '#8B5CF6',
-]
-
 const option = computed(() => {
   const keys = Object.keys(props.factors)
   const legendData = keys.map((k) => FACTOR_LABELS[k] || k)
+  const colors = theme.value.color
 
   const series = keys.map((key, idx) => ({
     name: FACTOR_LABELS[key] || key,
@@ -35,24 +32,26 @@ const option = computed(() => {
     data: props.factors[key],
     smooth: true,
     symbol: 'none',
-    lineStyle: { width: 1.5, color: PALETTE[idx % PALETTE.length] },
-    itemStyle: { color: PALETTE[idx % PALETTE.length] },
+    lineStyle: { width: 1.5, color: colors[idx % colors.length] },
+    itemStyle: { color: colors[idx % colors.length] },
   }))
 
   return {
-    animation: false,
+    animation: true,
+    animationDuration: 600,
+    animationEasing: 'cubicOut' as const,
     tooltip: {
       trigger: 'axis',
-      backgroundColor: 'rgba(24,24,27,0.95)',
-      borderColor: '#27272A',
-      textStyle: { color: '#FAFAFA', fontSize: 12 },
+      backgroundColor: theme.value.tooltip.backgroundColor,
+      borderColor: theme.value.tooltip.borderColor,
+      textStyle: theme.value.tooltip.textStyle,
     },
     legend: {
       type: 'scroll',
       data: legendData,
       top: 4,
-      textStyle: { color: '#A1A1AA', fontSize: 11 },
-      pageTextStyle: { color: '#A1A1AA' },
+      textStyle: { color: theme.value.legend.textStyle.color, fontSize: 11 },
+      pageTextStyle: { color: theme.value.legend.textStyle.color },
     },
     grid: {
       left: '10%',
@@ -63,13 +62,14 @@ const option = computed(() => {
     xAxis: {
       type: 'category' as const,
       data: props.dates,
-      axisLine: { lineStyle: { color: '#27272A' } },
-      axisLabel: { color: '#A1A1AA', fontSize: 10 },
+      axisLine: { lineStyle: { color: theme.value.axisLine.lineStyle.color } },
+      axisLabel: { color: theme.value.axisLabel.color, fontSize: 10 },
     },
     yAxis: {
       type: 'value' as const,
-      axisLabel: { color: '#A1A1AA' },
-      splitLine: { lineStyle: { color: '#27272A' } },
+      axisLabel: { color: theme.value.axisLabel.color },
+      axisLine: { lineStyle: { color: theme.value.axisLine.lineStyle.color } },
+      splitLine: { lineStyle: { color: theme.value.splitLine.lineStyle.color } },
     },
     series,
   }

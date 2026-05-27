@@ -3,6 +3,15 @@ import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 const routes: RouteRecordRaw[] = [
   {
     path: '/',
+    name: 'Dashboard',
+    component: () => import('../pages/Dashboard.vue'),
+  },
+  {
+    path: '/dashboard',
+    redirect: '/',
+  },
+  {
+    path: '/selection',
     name: 'SelectionHome',
     component: () => import('../pages/SelectionHome.vue'),
   },
@@ -29,6 +38,10 @@ const routes: RouteRecordRaw[] = [
     props: true,
   },
   {
+    path: '/backtest',
+    redirect: '/strategy/list',
+  },
+  {
     path: '/backtest/:strategyId',
     name: 'BacktestResult',
     component: () => import('../pages/BacktestResult.vue'),
@@ -38,6 +51,11 @@ const routes: RouteRecordRaw[] = [
     path: '/data/status',
     name: 'DataStatus',
     component: () => import('../pages/DataStatus.vue'),
+  },
+  {
+    path: '/settings',
+    name: 'Settings',
+    component: () => import('../pages/Settings.vue'),
   },
 ]
 

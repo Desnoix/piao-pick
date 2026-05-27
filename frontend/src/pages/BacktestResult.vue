@@ -2,7 +2,8 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useRouter } from 'vue-router'
-import { NDatePicker, NButton, NAlert, NSpace, NCard, NStatistic, NSpin } from 'naive-ui'
+import { NDatePicker, NButton, NStatistic, NSpin } from 'naive-ui'
+import { PhArrowLeft } from '@phosphor-icons/vue'
 import NavCurveChart from '../components/charts/NavCurveChart.vue'
 import MonthlyDistribution from '../components/charts/MonthlyDistribution.vue'
 import YearlyHeatmap from '../components/charts/YearlyHeatmap.vue'
@@ -21,6 +22,8 @@ const startDate = ref<number>(0)
 const endDate = ref<number>(0)
 const availableDates = ref<AvailableDates | null>(null)
 
+const monoValueStyle = { fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }
+
 onMounted(async () => {
   await loadAvailableDates()
 })
@@ -31,7 +34,6 @@ async function loadAvailableDates() {
     availableDates.value = dates
     
     if (dates.start_date && dates.end_date) {
-      // Set default date range: last 1 year
       const end = new Date(dates.end_date)
       const start = new Date(end)
       start.setFullYear(start.getFullYear() - 1)
@@ -39,7 +41,7 @@ async function loadAvailableDates() {
       startDate.value = start.getTime()
       endDate.value = end.getTime()
     }
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error('Failed to load available dates:', e)
   }
 }
@@ -65,15 +67,15 @@ async function handleRunBacktest() {
     })
 
     result.value = response
-  } catch (e: any) {
+  } catch (e: unknown) {
+    const err = e as { response?: { data?: { error?: string } }; message?: string }
     console.error('Backtest failed:', e)
-    error.value = e.response?.data?.error || e.message || '回测执行失败'
+    error.value = err.response?.data?.error || err.message || '回测执行失败'
   } finally {
     loading.value = false
   }
 }
 
-// Computed properties for charts
 const navData = computed(() => {
   if (!result.value) return null
   
@@ -85,7 +87,6 @@ const navData = computed(() => {
 
 const monthlyReturns = computed(() => {
   if (!result.value) return []
-  // Convert returns (decimal) to percentage
   return result.value.returns.map(r => r * 100)
 })
 
@@ -96,9 +97,8 @@ const yearlyHeatmapData = computed(() => {
   const years: string[] = []
   const yearMap: Record<string, number[]> = {}
 
-  // Group returns by year
   result.value.nav_series.forEach((item, idx) => {
-    if (idx === 0) return // Skip first item (initial NAV)
+    if (idx === 0) return
     const [dateStr] = item
     const year = dateStr.substring(0, 4)
     const month = parseInt(dateStr.substring(5, 7)) - 1
@@ -111,7 +111,6 @@ const yearlyHeatmapData = computed(() => {
     yearMap[year][month] = returns[idx - 1] * 100
   })
 
-  // Convert to heatmap format: [yearIdx, monthIdx, value]
   const data: [number, number, number][] = []
   years.forEach((year, yearIdx) => {
     for (let monthIdx = 0; monthIdx < 12; monthIdx++) {
@@ -134,24 +133,28 @@ function formatNumber(value: number | undefined): string {
   if (value === undefined || value === null) return '-'
   return value.toFixed(2)
 }
-
-function getReturnColor(value: number): string {
-  return value >= 0 ? '#10b981' : '#ef4444'
-}
 </script>
 
 <template>
-  <div class="backtest-page">
-    <div class="page-header">
-      <n-button @click="router.back()" quaternary>← 返回</n-button>
-      <h2>{{ strategyId }} 回测</h2>
+  <div class="flex flex-col gap-6">
+    <!-- Header -->
+    <div class="flex items-center gap-3 mb-2">
+      <button
+        class="flex items-center gap-1 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors cursor-pointer"
+        @click="router.back()"
+      >
+        <PhArrowLeft :size="16" />
+        返回
+      </button>
+      <h2 class="text-xl font-bold text-[var(--color-text-primary)]">{{ strategyId }} 回测</h2>
     </div>
 
-    <n-card class="config-card">
-      <n-space align="center" :size="16">
-        <n-space vertical :size="4">
-          <span class="label">开始日期</span>
-          <n-date-picker
+    <!-- Config -->
+    <div class="glass-panel p-5">
+      <div class="flex items-end gap-4 flex-wrap">
+        <div class="flex flex-col gap-1">
+          <span class="text-xs text-[var(--color-text-secondary)]">开始日期</span>
+          <NDatePicker
             v-model:value="startDate"
             type="date"
             clearable
@@ -162,11 +165,11 @@ function getReturnColor(value: number): string {
               return date < min || date > max
             }"
           />
-        </n-space>
+        </div>
 
-        <n-space vertical :size="4">
-          <span class="label">结束日期</span>
-          <n-date-picker
+        <div class="flex flex-col gap-1">
+          <span class="text-xs text-[var(--color-text-secondary)]">结束日期</span>
+          <NDatePicker
             v-model:value="endDate"
             type="date"
             clearable
@@ -177,125 +180,81 @@ function getReturnColor(value: number): string {
               return date < min || date > max
             }"
           />
-        </n-space>
+        </div>
 
-        <n-button
+        <NButton
           type="primary"
           @click="handleRunBacktest"
           :loading="loading"
           :disabled="!startDate || !endDate"
         >
           运行回测
-        </n-button>
-      </n-space>
+        </NButton>
+      </div>
 
-      <n-alert v-if="availableDates && availableDates.trade_date_count > 0" type="info" :bordered="false" class="mt-3">
+      <div
+        v-if="availableDates && availableDates.trade_date_count > 0"
+        class="mt-3 rounded-lg p-3 text-sm text-[var(--color-text-secondary)] bg-[var(--color-accent-muted)]"
+      >
         可用日期范围: {{ availableDates.start_date }} 至 {{ availableDates.end_date }}
         (共 {{ availableDates.trade_date_count }} 个交易日)
-      </n-alert>
-    </n-card>
+      </div>
+    </div>
 
-    <n-alert v-if="error" type="error" class="mt-4">
+    <!-- Error -->
+    <div
+      v-if="error"
+      class="rounded-lg p-4 text-sm border-l-4 border-l-[var(--color-error)] bg-[rgba(239,68,68,0.08)] text-[var(--color-text-primary)]"
+    >
       {{ error }}
-    </n-alert>
+    </div>
 
-    <n-spin :show="loading" class="mt-4">
-      <div v-if="result" class="results">
-        <n-card class="metrics-card">
-          <n-space :size="24" justify="space-around">
-            <n-statistic label="总收益" :value="formatPercent(result.metrics.total_return)">
+    <NSpin :show="loading">
+      <div v-if="result" class="flex flex-col gap-4">
+        <!-- Metrics -->
+        <div class="glass-panel p-5">
+          <div class="flex justify-around flex-wrap gap-6">
+            <NStatistic label="总收益" :value="formatPercent(result.metrics.total_return)" :value-style="monoValueStyle">
               <template #prefix>
-                <span :style="{ color: getReturnColor(result.metrics.total_return) }">●</span>
+                <span :class="result.metrics.total_return >= 0 ? 'text-up' : 'text-down'">●</span>
               </template>
-            </n-statistic>
+            </NStatistic>
 
-            <n-statistic label="年化收益" :value="formatPercent(result.metrics.annual_return)">
+            <NStatistic label="年化收益" :value="formatPercent(result.metrics.annual_return)" :value-style="monoValueStyle">
               <template #prefix>
-                <span :style="{ color: getReturnColor(result.metrics.annual_return) }">●</span>
+                <span :class="result.metrics.annual_return >= 0 ? 'text-up' : 'text-down'">●</span>
               </template>
-            </n-statistic>
+            </NStatistic>
 
-            <n-statistic label="夏普比率" :value="formatNumber(result.metrics.sharpe_ratio)" />
+            <NStatistic label="夏普比率" :value="formatNumber(result.metrics.sharpe_ratio)" :value-style="monoValueStyle" />
 
-            <n-statistic label="最大回撤" :value="formatPercent(result.metrics.max_drawdown)" />
+            <NStatistic label="最大回撤" :value="formatPercent(result.metrics.max_drawdown)" :value-style="monoValueStyle" />
 
-            <n-statistic label="月度胜率" :value="formatPercent(result.metrics.monthly_win_rate)" />
+            <NStatistic label="月度胜率" :value="formatPercent(result.metrics.monthly_win_rate)" :value-style="monoValueStyle" />
 
-            <n-statistic label="调仓次数" :value="result.period.rebalance_count" />
-          </n-space>
-        </n-card>
+            <NStatistic label="调仓次数" :value="result.period.rebalance_count" :value-style="monoValueStyle" />
+          </div>
+        </div>
 
-        <n-card v-if="navData" title="净值曲线" class="chart-card">
+        <!-- Charts -->
+        <div v-if="navData" class="glass-panel p-5">
+          <h3 class="text-base font-semibold text-[var(--color-text-primary)] mb-3">净值曲线</h3>
           <NavCurveChart
             :dates="navData.dates"
             :strategy-nav="navData.strategyNav"
           />
-        </n-card>
+        </div>
 
-        <n-card v-if="monthlyReturns.length > 0" title="月度收益分布" class="chart-card">
+        <div v-if="monthlyReturns.length > 0" class="glass-panel p-5">
+          <h3 class="text-base font-semibold text-[var(--color-text-primary)] mb-3">月度收益分布</h3>
           <MonthlyDistribution :data="monthlyReturns" />
-        </n-card>
+        </div>
 
-        <n-card
-          v-if="yearlyHeatmapData.data.length > 0"
-          title="年度热力图"
-          class="chart-card"
-        >
+        <div v-if="yearlyHeatmapData.data.length > 0" class="glass-panel p-5">
+          <h3 class="text-base font-semibold text-[var(--color-text-primary)] mb-3">年度热力图</h3>
           <YearlyHeatmap :data="yearlyHeatmapData.data" :years="yearlyHeatmapData.years" />
-        </n-card>
+        </div>
       </div>
-    </n-spin>
+    </NSpin>
   </div>
 </template>
-
-<style scoped>
-.backtest-page {
-  padding: 24px;
-  max-width: 1200px;
-  margin: 0 auto;
-}
-
-.page-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 24px;
-}
-
-.page-header h2 {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 600;
-}
-
-.config-card {
-  margin-bottom: 16px;
-}
-
-.label {
-  font-size: 13px;
-  color: var(--n-text-color-3);
-}
-
-.results {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.metrics-card {
-  margin-bottom: 16px;
-}
-
-.chart-card {
-  margin-bottom: 16px;
-}
-
-.mt-3 {
-  margin-top: 12px;
-}
-
-.mt-4 {
-  margin-top: 16px;
-}
-</style>

@@ -10,8 +10,11 @@ import {
   LegendComponent,
 } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
+import { useChartTheme } from '../composables/use-chart-theme'
 
 use([LineChart, TitleComponent, TooltipComponent, GridComponent, LegendComponent, CanvasRenderer])
+
+const { theme } = useChartTheme()
 
 const props = defineProps<{
   quarters: string[]
@@ -20,82 +23,82 @@ const props = defineProps<{
   grossMargin: number[]
 }>()
 
-const CHART_COLORS = {
-  primary: '#3B82F6',
-  up: '#EF4444',
-  down: '#22C55E',
-  accent: '#A78BFA',
-}
+const option = computed(() => {
+  const colors = theme.value.color
 
-const option = computed(() => ({
-  animation: false,
-  tooltip: {
-    trigger: 'axis',
-    backgroundColor: 'rgba(24,24,27,0.95)',
-    borderColor: '#27272A',
-    textStyle: { color: '#FAFAFA', fontSize: 12 },
-  },
-  legend: {
-    data: ['营收增长', '利润增长', '毛利率'],
-    top: 4,
-    textStyle: { color: '#A1A1AA' },
-  },
-  grid: {
-    left: '12%',
-    right: '5%',
-    top: '18%',
-    bottom: '10%',
-  },
-  xAxis: {
-    type: 'category',
-    data: props.quarters,
-    axisLine: { lineStyle: { color: '#27272A' } },
-    axisLabel: { color: '#A1A1AA' },
-  },
-  yAxis: {
-    type: 'value',
-    axisLabel: {
-      color: '#A1A1AA',
-      formatter: '{value}%',
+  return {
+    animation: true,
+    animationDuration: 600,
+    animationEasing: 'cubicOut' as const,
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: theme.value.tooltip.backgroundColor,
+      borderColor: theme.value.tooltip.borderColor,
+      textStyle: theme.value.tooltip.textStyle,
     },
-    splitLine: { lineStyle: { color: '#27272A' } },
-  },
-  series: [
-    {
-      name: '营收增长',
-      type: 'line',
-      data: props.revGrowth,
-      smooth: true,
-      symbol: 'circle',
-      symbolSize: 6,
-      lineStyle: { width: 2, color: CHART_COLORS.up },
-      itemStyle: { color: CHART_COLORS.up },
-      label: {
-        show: false,
+    legend: {
+      data: ['营收增长', '利润增长', '毛利率'],
+      top: 4,
+      textStyle: { color: theme.value.legend.textStyle.color },
+    },
+    grid: {
+      left: '12%',
+      right: '5%',
+      top: '18%',
+      bottom: '10%',
+    },
+    xAxis: {
+      type: 'category',
+      data: props.quarters,
+      axisLine: { lineStyle: { color: theme.value.axisLine.lineStyle.color } },
+      axisLabel: { color: theme.value.axisLabel.color },
+    },
+    yAxis: {
+      type: 'value',
+      axisLabel: {
+        color: theme.value.axisLabel.color,
+        formatter: '{value}%',
       },
+      axisLine: { lineStyle: { color: theme.value.axisLine.lineStyle.color } },
+      splitLine: { lineStyle: { color: theme.value.splitLine.lineStyle.color } },
     },
-    {
-      name: '利润增长',
-      type: 'line',
-      data: props.earGrowth,
-      smooth: true,
-      symbol: 'diamond',
-      symbolSize: 6,
-      lineStyle: { width: 2, color: CHART_COLORS.primary },
-      itemStyle: { color: CHART_COLORS.primary },
-    },
-    {
-      name: '毛利率',
-      type: 'line',
-      data: props.grossMargin,
-      smooth: true,
-      symbol: 'rect',
-      symbolSize: 6,
-      lineStyle: { width: 2, color: CHART_COLORS.accent },
-      itemStyle: { color: CHART_COLORS.accent },
-    },
-  ],
-}))
+    series: [
+      {
+        name: '营收增长',
+        type: 'line',
+        data: props.revGrowth,
+        smooth: true,
+        symbol: 'circle',
+        symbolSize: 6,
+        lineStyle: { width: 2, color: colors[0] },
+        itemStyle: { color: colors[0] },
+        label: {
+          show: false,
+        },
+      },
+      {
+        name: '利润增长',
+        type: 'line',
+        data: props.earGrowth,
+        smooth: true,
+        symbol: 'diamond',
+        symbolSize: 6,
+        lineStyle: { width: 2, color: colors[1] },
+        itemStyle: { color: colors[1] },
+      },
+      {
+        name: '毛利率',
+        type: 'line',
+        data: props.grossMargin,
+        smooth: true,
+        symbol: 'rect',
+        symbolSize: 6,
+        lineStyle: { width: 2, color: colors[2] },
+        itemStyle: { color: colors[2] },
+      },
+    ],
+  }
+})
 </script>
 
 <template>

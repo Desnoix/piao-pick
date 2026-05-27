@@ -5,8 +5,11 @@ import { use } from 'echarts/core'
 import { PieChart } from 'echarts/charts'
 import { TooltipComponent, LegendComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
+import { useChartTheme } from '../../composables/use-chart-theme'
 
 use([PieChart, TooltipComponent, LegendComponent, CanvasRenderer])
+
+const { theme } = useChartTheme()
 
 const props = defineProps<{
   data: Array<{ name: string; value: number }>
@@ -14,15 +17,22 @@ const props = defineProps<{
 
 const option = computed(() => {
   return {
-    animation: false,
+    animation: true,
+    animationDuration: 600,
+    animationEasing: 'cubicOut' as const,
+    color: theme.value.color,
     tooltip: {
       trigger: 'item',
+      backgroundColor: theme.value.tooltip.backgroundColor,
+      borderColor: theme.value.tooltip.borderColor,
+      textStyle: theme.value.tooltip.textStyle,
       formatter: '{b}: {c} ({d}%)',
     },
     legend: {
       orient: 'vertical',
       left: 'left',
       type: 'scroll',
+      textStyle: { color: theme.value.legend.textStyle.color },
     },
     series: [
       {
@@ -38,6 +48,7 @@ const option = computed(() => {
           },
         },
         label: {
+          color: theme.value.textStyle.color,
           formatter: '{b}\n{d}%',
         },
       },

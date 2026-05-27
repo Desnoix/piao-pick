@@ -3,17 +3,15 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import {
   NButton,
   NDataTable,
-  NSpace,
-  NAlert,
   NSpin,
   NProgress,
   NDatePicker,
   NSelect,
   NTag,
-  NDivider,
   useMessage,
 } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
+import { PhDatabase, PhArrowsClockwise, PhFunction, PhCalendarBlank } from '@phosphor-icons/vue'
 import {
   getDataStatus,
   syncData,
@@ -31,24 +29,17 @@ const syncing = ref(false)
 const status = ref<DataStatus | null>(null)
 const calendar = ref<TradeCalendar | null>(null)
 
-// 历史同步相关
 const historySyncing = ref(false)
 const historySyncTask = ref<HistorySyncProgress | null>(null)
-const historyStartDate = ref<number>(Date.now() - 365 * 24 * 60 * 60 * 1000) // 1年前
+const historyStartDate = ref<number>(Date.now() - 365 * 24 * 60 * 60 * 1000)
 const historyEndDate = ref<number>(Date.now())
 const adjustType = ref('qfq')
 let pollTimer: number | null = null
 
-// 因子计算相关
 const factorComputing = ref(false)
 const factorResult = ref<{ computed: number; failed: number; total: number } | null>(null)
 
 const statusRows = ref<Array<{ key: string; value: string }>>([])
-
-const statusColumns: DataTableColumns<{ key: string; value: string }> = [
-  { title: '指标', key: 'key', width: 200 },
-  { title: '值', key: 'value' },
-]
 
 const calendarColumns: DataTableColumns<{ date: string; isTradeDay: boolean }> = [
   { title: '日期', key: 'date', width: 150 },
@@ -89,6 +80,18 @@ const isHistorySyncActive = computed(() => {
   return st === 'pending' || st === 'running'
 })
 
+const taskBorderClass = computed(() => {
+  if (!historySyncTask.value) return ''
+  switch (historySyncTask.value.status) {
+    case 'completed':
+      return 'border-l-[var(--color-success)] bg-[rgba(34,197,94,0.08)]'
+    case 'failed':
+      return 'border-l-[var(--color-error)] bg-[rgba(239,68,68,0.08)]'
+    default:
+      return 'border-l-[var(--color-accent)] bg-[var(--color-accent-muted)]'
+  }
+})
+
 async function loadStatus() {
   loading.value = true
   try {
@@ -101,7 +104,6 @@ async function loadStatus() {
       { key: '最新因子日期', value: status.value.latest_factor_date || '-' },
     ]
 
-    // Load calendar
     calendar.value = await getTradeCalendar()
     const tradeSet = new Set(calendar.value.trading_days)
     const rows: { date: string; isTradeDay: boolean }[] = []
@@ -113,7 +115,7 @@ async function loadStatus() {
       rows.push({ date: ds, isTradeDay: tradeSet.has(ds) })
     }
     calendarRows.value = rows
-  } catch (e: any) {
+  } catch (e: unknown) {
     message.error('加载状态失败')
   } finally {
     loading.value = false
@@ -130,7 +132,7 @@ async function handleSync() {
     } else {
       message.error(`同步失败: ${result.message}`)
     }
-  } catch (e: any) {
+  } catch (e: unknown) {
     message.error('同步请求失败')
   } finally {
     syncing.value = false
@@ -158,10 +160,10 @@ async function handleHistorySync() {
     historySyncTask.value = task
     message.success(`历史同步任务已启动: ${task.task_id}`)
     
-    // 启动轮询
     startPolling()
-  } catch (e: any) {
-    const detail = e?.response?.data?.detail || '启动历史同步失败'
+  } catch (e: unknown) {
+    const err = e as { response?: { data?: { detail?: string } } }
+    const detail = err?.response?.data?.detail || '启动历史同步失败'
     message.error(detail)
   } finally {
     historySyncing.value = false
@@ -188,7 +190,6 @@ async function pollHistorySyncStatus() {
     if (status) {
       historySyncTask.value = status
       
-      // 任务完成或失败时停止轮询
       if (status.status === 'completed') {
         stopPolling()
         message.success(
@@ -207,7 +208,6 @@ async function pollHistorySyncStatus() {
 }
 
 async function loadCurrentTask() {
-  // 页面加载时检查是否有正在运行的任务
   try {
     const status = await getHistorySyncStatus()
     if (status && isHistorySyncActiveStatus(status.status)) {
@@ -215,27 +215,12 @@ async function loadCurrentTask() {
       startPolling()
     }
   } catch (e) {
-    // 忽略
+    // ignore
   }
 }
 
 function isHistorySyncActiveStatus(st: string): boolean {
   return st === 'pending' || st === 'running'
-}
-
-function getStatusType(status: string): 'success' | 'warning' | 'error' | 'info' {
-  switch (status) {
-    case 'running':
-      return 'info'
-    case 'completed':
-      return 'success'
-    case 'failed':
-      return 'error'
-    case 'pending':
-      return 'warning'
-    default:
-      return 'info'
-  }
 }
 
 function getStatusText(status: string): string {
@@ -275,8 +260,9 @@ async function handleFactorCompute() {
     } else {
       message.error('因子计算返回异常')
     }
-  } catch (e: any) {
-    const detail = e?.response?.data?.detail || e?.message || '因子计算失败'
+  } catch (e: unknown) {
+    const err = e as { response?: { data?: { detail?: string } }; message?: string }
+    const detail = err?.response?.data?.detail || err?.message || '因子计算失败'
     message.error(detail)
     console.error('Factor compute error:', e)
   } finally {
@@ -296,7 +282,8 @@ onUnmounted(() => {
 
 <template>
   <NSpin :show="loading">
-    <div class="flex flex-col gap-6 max-w-4xl">
+    <div class="flex flex-col gap-6">
+      <!-- Header -->
       <div class="flex items-center justify-between">
         <div>
           <h2 class="text-xl font-bold text-[var(--color-text-primary)]">数据状态</h2>
@@ -307,124 +294,134 @@ onUnmounted(() => {
         </NButton>
       </div>
 
-      <div class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-lg p-4">
-        <h3 class="text-lg font-bold mb-2 text-[var(--color-text-primary)]">数据库概览</h3>
-        <NDataTable
-          :columns="statusColumns"
-          :data="statusRows"
-          size="small"
-          :bordered="false"
-        />
-      </div>
-
-      <NDivider />
-
-      <div class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-lg p-4">
-        <h3 class="text-lg font-bold mb-2 text-[var(--color-text-primary)]">历史数据同步</h3>
-        <p class="text-sm text-[var(--color-text-secondary)] mb-4">
-          批量拉取全市场历史K线数据（约需要 30-60 分钟）。支持断点续传，可随时暂停和恢复。
-        </p>
-
-        <div class="flex flex-col gap-4">
-          <!-- 日期范围选择 -->
-          <div class="flex items-center gap-4">
-            <div class="flex-1">
-              <label class="block text-sm mb-1 text-[var(--color-text-secondary)]">开始日期</label>
-              <NDatePicker
-                v-model:value="historyStartDate"
-                type="date"
-                :disabled="isHistorySyncActive"
-                clearable
-              />
-            </div>
-            <div class="flex-1">
-              <label class="block text-sm mb-1 text-[var(--color-text-secondary)]">结束日期</label>
-              <NDatePicker
-                v-model:value="historyEndDate"
-                type="date"
-                :disabled="isHistorySyncActive"
-                clearable
-              />
-            </div>
-            <div class="w-40">
-              <label class="block text-sm mb-1 text-[var(--color-text-secondary)]">复权类型</label>
-              <NSelect
-                v-model:value="adjustType"
-                :options="adjustTypeOptions"
-                :disabled="isHistorySyncActive"
-                size="small"
-              />
-            </div>
-            <div class="w-40 pt-6">
-              <NButton
-                type="primary"
-                :loading="historySyncing"
-                :disabled="isHistorySyncActive"
-                block
-                @click="handleHistorySync"
-              >
-                开始拉取历史数据
-              </NButton>
-            </div>
-          </div>
-
-          <!-- 任务进度 -->
-          <NAlert
-            v-if="historySyncTask"
-            :type="getStatusType(historySyncTask.status)"
-            :title="`同步任务: ${getStatusText(historySyncTask.status)}`"
-            class="mt-4"
+      <!-- DB Overview -->
+      <div class="glass-panel p-5">
+        <h3 class="flex items-center gap-2 text-base font-semibold text-[var(--color-text-primary)] mb-4">
+          <PhDatabase :size="18" class="text-[var(--color-text-secondary)]" />
+          数据库概览
+        </h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div
+            v-for="row in statusRows"
+            :key="row.key"
+            class="flex items-center justify-between p-3 rounded-lg bg-[var(--color-surface-inset)]"
           >
-            <div class="space-y-3">
-              <NProgress
-                type="line"
-                :percentage="historySyncStatus?.percent || 0"
-                :status="historySyncTask.status === 'failed' ? 'error' : 'default'"
-              />
-
-              <div class="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
-                <div>
-                  <span class="text-[var(--color-text-secondary)]">股票总数:</span>
-                  <div class="font-mono text-[var(--color-text-primary)]">{{ historySyncTask.progress.total }}</div>
-                </div>
-                <div>
-                  <span class="text-[var(--color-text-secondary)]">已完成:</span>
-                  <div class="font-mono text-[var(--color-text-primary)]">{{ historySyncTask.progress.completed }}</div>
-                </div>
-                <div>
-                  <span class="text-[var(--color-text-secondary)]">失败:</span>
-                  <div class="font-mono text-red-500">{{ historySyncTask.progress.failed }}</div>
-                </div>
-                <div>
-                  <span class="text-[var(--color-text-secondary)]">K线数:</span>
-                  <div class="font-mono text-[var(--color-text-primary)]">{{ historySyncTask.progress.total_klines }}</div>
-                </div>
-                <div>
-                  <span class="text-[var(--color-text-secondary)]">当前:</span>
-                  <div class="font-mono truncate text-[var(--color-text-primary)]">
-                    <NTag v-if="historySyncTask.progress.current_stock" size="small">
-                      {{ historySyncTask.progress.current_stock }}
-                    </NTag>
-                    <span v-else class="text-[var(--color-text-muted)]">-</span>
-                  </div>
-                </div>
-              </div>
-
-              <div class="text-xs text-[var(--color-text-muted)]">
-                任务ID: {{ historySyncTask.task_id }} |
-                日期范围: {{ historySyncTask.start_date }} ~ {{ historySyncTask.end_date }} |
-                创建: {{ new Date(historySyncTask.created_at).toLocaleString('zh-CN') }}
-              </div>
-            </div>
-          </NAlert>
+            <span class="text-sm text-[var(--color-text-secondary)]">{{ row.key }}</span>
+            <span class="data-mono text-sm text-[var(--color-text-primary)]">{{ row.value }}</span>
+          </div>
         </div>
       </div>
 
-      <NDivider />
+      <!-- History Sync -->
+      <div class="glass-panel p-5">
+        <h3 class="flex items-center gap-2 text-base font-semibold text-[var(--color-text-primary)] mb-2">
+          <PhArrowsClockwise :size="18" class="text-[var(--color-text-secondary)]" />
+          历史数据同步
+        </h3>
+        <p class="text-sm text-[var(--color-text-secondary)] mb-4">
+          批量拉取全市场历史K线数据 (约需要 30-60 分钟)。支持断点续传，可随时暂停和恢复。
+        </p>
 
-      <!-- 因子计算 -->
-      <div class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-lg p-4">
-        <h3 class="text-lg font-bold mb-2 text-[var(--color-text-primary)]">时序因子计算</h3>
+        <div class="flex items-end gap-4 flex-wrap">
+          <div class="flex-1 min-w-[160px]">
+            <label class="block text-xs text-[var(--color-text-secondary)] mb-1">开始日期</label>
+            <NDatePicker
+              v-model:value="historyStartDate"
+              type="date"
+              :disabled="isHistorySyncActive"
+              clearable
+            />
+          </div>
+          <div class="flex-1 min-w-[160px]">
+            <label class="block text-xs text-[var(--color-text-secondary)] mb-1">结束日期</label>
+            <NDatePicker
+              v-model:value="historyEndDate"
+              type="date"
+              :disabled="isHistorySyncActive"
+              clearable
+            />
+          </div>
+          <div class="w-40">
+            <label class="block text-xs text-[var(--color-text-secondary)] mb-1">复权类型</label>
+            <NSelect
+              v-model:value="adjustType"
+              :options="adjustTypeOptions"
+              :disabled="isHistorySyncActive"
+              size="small"
+            />
+          </div>
+          <div class="w-40 pb-0.5">
+            <NButton
+              type="primary"
+              :loading="historySyncing"
+              :disabled="isHistorySyncActive"
+              block
+              @click="handleHistorySync"
+            >
+              开始拉取历史数据
+            </NButton>
+          </div>
+        </div>
+
+        <!-- Task Progress -->
+        <div
+          v-if="historySyncTask"
+          class="mt-4 rounded-lg p-4 border-l-4"
+          :class="taskBorderClass"
+        >
+          <div class="text-sm font-semibold text-[var(--color-text-primary)] mb-3">
+            同步任务: {{ getStatusText(historySyncTask.status) }}
+          </div>
+          <div class="space-y-3">
+            <NProgress
+              type="line"
+              :percentage="historySyncStatus?.percent || 0"
+              :status="historySyncTask.status === 'failed' ? 'error' : 'default'"
+            />
+
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
+              <div>
+                <span class="text-[var(--color-text-secondary)]">股票总数:</span>
+                <div class="data-mono text-[var(--color-text-primary)]">{{ historySyncTask.progress.total }}</div>
+              </div>
+              <div>
+                <span class="text-[var(--color-text-secondary)]">已完成:</span>
+                <div class="data-mono text-[var(--color-text-primary)]">{{ historySyncTask.progress.completed }}</div>
+              </div>
+              <div>
+                <span class="text-[var(--color-text-secondary)]">失败:</span>
+                <div class="data-mono text-[var(--color-error)]">{{ historySyncTask.progress.failed }}</div>
+              </div>
+              <div>
+                <span class="text-[var(--color-text-secondary)]">K线数:</span>
+                <div class="data-mono text-[var(--color-text-primary)]">{{ historySyncTask.progress.total_klines }}</div>
+              </div>
+              <div>
+                <span class="text-[var(--color-text-secondary)]">当前:</span>
+                <div class="data-mono truncate text-[var(--color-text-primary)]">
+                  <NTag v-if="historySyncTask.progress.current_stock" size="small">
+                    {{ historySyncTask.progress.current_stock }}
+                  </NTag>
+                  <span v-else class="text-[var(--color-text-muted)]">-</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="text-xs text-[var(--color-text-muted)]">
+              任务ID: {{ historySyncTask.task_id }} |
+              日期范围: {{ historySyncTask.start_date }} ~ {{ historySyncTask.end_date }} |
+              创建: {{ new Date(historySyncTask.created_at).toLocaleString('zh-CN') }}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Factor Compute -->
+      <div class="glass-panel p-5">
+        <h3 class="flex items-center gap-2 text-base font-semibold text-[var(--color-text-primary)] mb-2">
+          <PhFunction :size="18" class="text-[var(--color-text-secondary)]" />
+          时序因子计算
+        </h3>
         <p class="text-sm text-[var(--color-text-secondary)] mb-4">
           基于已拉取的历史K线数据，计算时序因子 (20日动量、60日波动率、20日均换手率)。
           请先完成历史数据同步，再执行因子计算。耗时取决于股票数量。
@@ -438,33 +435,34 @@ onUnmounted(() => {
           {{ factorComputing ? '计算中...' : '开始计算因子' }}
         </NButton>
 
-        <NAlert
+        <div
           v-if="factorResult"
-          type="success"
-          title="因子计算结果"
-          class="mt-4"
+          class="mt-4 rounded-lg p-4 border-l-4 border-l-[var(--color-success)] bg-[rgba(34,197,94,0.08)]"
         >
+          <div class="text-sm font-semibold text-[var(--color-text-primary)] mb-3">因子计算结果</div>
           <div class="grid grid-cols-3 gap-3 text-sm">
             <div>
               <span class="text-[var(--color-text-secondary)]">总股票数:</span>
-              <div class="font-mono text-[var(--color-text-primary)]">{{ factorResult.total }}</div>
+              <div class="data-mono text-[var(--color-text-primary)]">{{ factorResult.total }}</div>
             </div>
             <div>
               <span class="text-[var(--color-text-secondary)]">计算成功:</span>
-              <div class="font-mono text-green-500">{{ factorResult.computed }}</div>
+              <div class="data-mono text-[var(--color-success)]">{{ factorResult.computed }}</div>
             </div>
             <div>
               <span class="text-[var(--color-text-secondary)]">计算失败:</span>
-              <div class="font-mono text-red-500">{{ factorResult.failed }}</div>
+              <div class="data-mono text-[var(--color-error)]">{{ factorResult.failed }}</div>
             </div>
           </div>
-        </NAlert>
+        </div>
       </div>
 
-      <NDivider />
-
-      <div class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-lg p-4">
-        <h3 class="text-lg font-bold mb-2 text-[var(--color-text-primary)]">交易日历</h3>
+      <!-- Calendar -->
+      <div class="glass-panel p-5">
+        <h3 class="flex items-center gap-2 text-base font-semibold text-[var(--color-text-primary)] mb-4">
+          <PhCalendarBlank :size="18" class="text-[var(--color-text-secondary)]" />
+          交易日历
+        </h3>
         <NDataTable
           :columns="calendarColumns"
           :data="calendarRows"

@@ -11,8 +11,11 @@ import {
 } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 import type { NavSeries } from '../../types/strategy'
+import { useChartTheme } from '../../composables/use-chart-theme'
 
 use([LineChart, TitleComponent, TooltipComponent, GridComponent, LegendComponent, CanvasRenderer])
+
+const { theme } = useChartTheme()
 
 const props = defineProps<{
   dates?: string[]
@@ -23,17 +26,6 @@ const props = defineProps<{
   height?: number
 }>()
 
-const CHART_COLORS = [
-  '#3B82F6',
-  '#F59E0B',
-  '#8B5CF6',
-  '#EC4899',
-  '#10B981',
-  '#F97316',
-  '#06B6D4',
-  '#EF4444',
-]
-
 const option = computed(() => {
   if (props.series && props.series.length > 0) {
     return buildMultiSeriesOption()
@@ -43,14 +35,20 @@ const option = computed(() => {
 
 function buildLegacyOption() {
   return {
-    animation: false,
+    animation: true,
+    animationDuration: 600,
+    animationEasing: 'cubicOut' as const,
     tooltip: {
       trigger: 'axis',
       axisPointer: { type: 'cross' },
+      backgroundColor: theme.value.tooltip.backgroundColor,
+      borderColor: theme.value.tooltip.borderColor,
+      textStyle: theme.value.tooltip.textStyle,
     },
     legend: {
       data: ['策略净值', '沪深300'],
       top: 10,
+      textStyle: { color: theme.value.legend.textStyle.color },
     },
     grid: {
       left: '10%',
@@ -61,10 +59,15 @@ function buildLegacyOption() {
     xAxis: {
       type: 'category',
       data: props.dates || [],
+      axisLine: { lineStyle: { color: theme.value.axisLine.lineStyle.color } },
+      axisLabel: { color: theme.value.axisLabel.color },
     },
     yAxis: {
       type: 'value',
       scale: true,
+      axisLine: { lineStyle: { color: theme.value.axisLine.lineStyle.color } },
+      axisLabel: { color: theme.value.axisLabel.color },
+      splitLine: { lineStyle: { color: theme.value.splitLine.lineStyle.color } },
     },
     series: [
       {
@@ -73,7 +76,8 @@ function buildLegacyOption() {
         data: props.strategyNav || [],
         smooth: true,
         symbol: 'none',
-        lineStyle: { width: 2 },
+        lineStyle: { width: 2, color: theme.value.color[0] },
+        itemStyle: { color: theme.value.color[0] },
       },
       {
         name: '沪深300',
@@ -81,7 +85,8 @@ function buildLegacyOption() {
         data: props.benchmarkNav || [],
         smooth: true,
         symbol: 'none',
-        lineStyle: { width: 2, type: 'dashed' },
+        lineStyle: { width: 2, type: 'dashed', color: theme.value.textStyle.color },
+        itemStyle: { color: theme.value.textStyle.color },
       },
     ],
   }
@@ -91,33 +96,42 @@ function buildMultiSeriesOption() {
   const multiSeries = props.series || []
   const legendNames = multiSeries.map((s) => s.name)
   const xData = multiSeries.length > 0 ? multiSeries[0].dates : []
+  const colors = theme.value.color
 
-  const chartSeries = multiSeries.map((s, i) => ({
-    name: s.name,
-    type: 'line' as const,
-    data: s.values,
-    smooth: true,
-    symbol: 'none',
-    lineStyle: {
-      width: 2,
-      color: s.color || CHART_COLORS[i % CHART_COLORS.length],
-      type: i === multiSeries.length - 1 && s.name.includes('沪深') ? ('dashed' as const) : ('solid' as const),
-    },
-    itemStyle: {
-      color: s.color || CHART_COLORS[i % CHART_COLORS.length],
-    },
-  }))
+  const chartSeries = multiSeries.map((s, i) => {
+    const isBenchmark = s.name.includes('沪深')
+    const lineColor = s.color || (isBenchmark ? theme.value.textStyle.color : colors[i % colors.length])
+    return {
+      name: s.name,
+      type: 'line' as const,
+      data: s.values,
+      smooth: true,
+      symbol: 'none',
+      lineStyle: {
+        width: 2,
+        color: lineColor,
+        type: i === multiSeries.length - 1 && isBenchmark ? ('dashed' as const) : ('solid' as const),
+      },
+      itemStyle: { color: lineColor },
+    }
+  })
 
   return {
-    animation: false,
+    animation: true,
+    animationDuration: 600,
+    animationEasing: 'cubicOut' as const,
     tooltip: {
       trigger: 'axis',
       axisPointer: { type: 'cross' },
+      backgroundColor: theme.value.tooltip.backgroundColor,
+      borderColor: theme.value.tooltip.borderColor,
+      textStyle: theme.value.tooltip.textStyle,
     },
     legend: {
       data: legendNames,
       top: 10,
       type: 'scroll',
+      textStyle: { color: theme.value.legend.textStyle.color },
     },
     grid: {
       left: '8%',
@@ -128,11 +142,16 @@ function buildMultiSeriesOption() {
     xAxis: {
       type: 'category',
       data: xData,
+      axisLine: { lineStyle: { color: theme.value.axisLine.lineStyle.color } },
+      axisLabel: { color: theme.value.axisLabel.color },
     },
     yAxis: {
       type: props.logScale ? 'log' : 'value',
       scale: true,
       min: props.logScale ? undefined : 'dataMin',
+      axisLine: { lineStyle: { color: theme.value.axisLine.lineStyle.color } },
+      axisLabel: { color: theme.value.axisLabel.color },
+      splitLine: { lineStyle: { color: theme.value.splitLine.lineStyle.color } },
     },
     series: chartSeries,
   }

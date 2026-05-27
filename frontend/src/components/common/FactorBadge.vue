@@ -1,4 +1,8 @@
 <script setup lang="ts">
+/**
+ * Factor badge: compact inline badge with label, mini bar, and value.
+ * 因子徽章: 紧凑行内徽章, 包含标签、迷你进度条和数值。
+ */
 import { computed } from 'vue'
 
 const props = defineProps<{
@@ -13,11 +17,12 @@ const percentage = computed(() => {
   return Math.min(100, (props.value / maxValue.value) * 100)
 })
 
+/** Use new token system for fill colors */
 const fillColor = computed(() => {
-  if (percentage.value > 75) return '#22C55E'
-  if (percentage.value > 50) return '#3B82F6'
-  if (percentage.value > 25) return '#EAB308'
-  return '#EF4444'
+  if (percentage.value >= 70) return 'var(--color-accent)'
+  if (percentage.value >= 40) return 'var(--color-primary)'
+  if (percentage.value >= 20) return 'var(--color-warning)'
+  return 'var(--color-error)'
 })
 </script>
 
@@ -29,25 +34,18 @@ const fillColor = computed(() => {
       border-color: var(--color-border);
     "
   >
-    <span
-      class="text-xs"
-      style="color: var(--color-text-secondary)"
-    >
+    <span class="text-xs text-[var(--color-text-secondary)]">
       {{ label }}
     </span>
     <div
-      class="w-16 h-1.5 rounded-full overflow-hidden"
-      style="background-color: var(--color-border)"
+      class="w-16 h-1.5 rounded-full overflow-hidden bg-[var(--color-border)]"
     >
       <div
         class="h-full rounded-full transition-all duration-300"
         :style="{ width: percentage + '%', backgroundColor: fillColor }"
       />
     </div>
-    <span
-      class="font-mono text-xs font-medium"
-      style="color: var(--color-text-primary)"
-    >
+    <span class="data-mono text-xs font-medium text-[var(--color-text-primary)]">
       {{ value.toFixed(1) }}
     </span>
   </div>

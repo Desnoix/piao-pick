@@ -1,4 +1,8 @@
 <script setup lang="ts">
+/**
+ * Selection home: two-panel layout with strategy run, results table, and factor radar.
+ * 选股主页: 左侧结果表格 + 右侧因子雷达面板。
+ */
 import { ref, h, computed, onMounted, watch } from 'vue'
 import {
   NDataTable,
@@ -14,19 +18,15 @@ import { useStrategyStore } from '../stores/strategy'
 import { useSelectionStore } from '../stores/selection'
 import { runSelection } from '../api/selection'
 import FactorRadar from '../components/charts/FactorRadar.vue'
-import {
-  formatPrice,
-  formatPct,
-  getPctColor,
-  formatMarketCap,
-  formatNumber,
-} from '../utils/format'
+import { useChartTheme } from '../composables/use-chart-theme'
+import { PhMagnifyingGlass, PhCursorClick, PhPlay } from '@phosphor-icons/vue'
 import type { SelectionRecord } from '../types/selection'
 
 const router = useRouter()
 const strategyStore = useStrategyStore()
 const selectionStore = useSelectionStore()
 const message = useMessage()
+const { theme } = useChartTheme()
 
 const selectedStrategy = ref<string | null>(null)
 const selectedStock = ref<SelectionRecord | null>(null)
@@ -60,7 +60,7 @@ const columns: DataTableColumns<SelectionRecord> = [
     render(row) {
       return h(
         'span',
-        { class: 'font-mono font-medium text-[var(--color-text-secondary)]' },
+        { class: 'data-mono text-[var(--color-text-secondary)]' },
         row.rank
       )
     },
@@ -74,8 +74,11 @@ const columns: DataTableColumns<SelectionRecord> = [
         'a',
         {
           class:
-            'font-mono text-[var(--color-accent)] cursor-pointer hover:underline',
-          onClick: () => router.push(`/stock/${row.ts_code}`),
+            'data-mono text-[var(--color-accent)] cursor-pointer hover:underline',
+          onClick: (e: Event) => {
+            e.stopPropagation()
+            router.push(`/stock/${row.ts_code}`)
+          },
         },
         row.ts_code
       )
@@ -84,13 +87,25 @@ const columns: DataTableColumns<SelectionRecord> = [
   {
     title: '评分',
     key: 'composite_score',
-    width: 90,
+    width: 100,
     sorter: (a, b) => a.composite_score - b.composite_score,
     render(row) {
       return h(
         'span',
-        { class: 'font-mono font-medium text-[var(--color-text-primary)]' },
+        { class: 'data-mono font-medium text-[var(--color-text-primary)]' },
         row.composite_score.toFixed(2)
+      )
+    },
+  },
+  {
+    title: '日期',
+    key: 'trade_date',
+    width: 110,
+    render(row) {
+      return h(
+        'span',
+        { class: 'text-xs text-[var(--color-text-muted)]' },
+        row.trade_date
       )
     },
   },
@@ -122,9 +137,9 @@ async function handleRun() {
     const count = res?.final_count ?? res?.results?.length ?? 0
     const universe = res?.universe_count ?? 0
     if (universe === 0) {
-      message.warning('没有可用的因子数据，请到 数据页面 手动同步')
+      message.warning('没有可用的因子数据, 请到数据页面手动同步')
     } else if (count === 0) {
-      message.warning(`从 ${universe} 只股票中未选出候选，请检查策略配置`)
+      message.warning(`从 ${universe} 只股票中未选出候选, 请检查策略配置`)
     } else {
       message.success(`选股完成: 从 ${universe} 只股票中选出 ${count} 只`)
     }
@@ -134,7 +149,7 @@ async function handleRun() {
     console.error('Selection error:', e)
     if (detail.includes('数据准备失败') || detail.includes('Connection') || detail.includes('closed')) {
       message.error(
-        '数据获取失败，可能是网络问题或东方财富接口限制。请到 数据页面 手动重试同步。'
+        '数据获取失败, 可能是网络问题或东方财富接口限制。请到数据页面手动重试同步。'
       )
     } else {
       message.error(detail)
@@ -152,7 +167,8 @@ function handleRowClick(row: SelectionRecord) {
 
 function rowClassName(row: SelectionRecord) {
   const base = 'cursor-pointer transition-colors'
-  return row === selectedStock.value ? `${base} row-selected` : base
+  if (row === selectedStock.value) return `${base} row--selected`
+  return base
 }
 
 onMounted(async () => {
@@ -174,7 +190,7 @@ watch(selectedStrategy, async (val) => {
   <div class="flex flex-col gap-5">
     <!-- Top action bar -->
     <div class="flex items-center gap-3 flex-wrap">
-      <!-- Strategy selector + run button grouped together -->
+      <!-- Strategy selector + run button -->
       <div class="flex items-center gap-2">
         <NSelect
           v-model:value="selectedStrategy"
@@ -187,6 +203,9 @@ watch(selectedStrategy, async (val) => {
           :loading="running"
           @click="handleRun"
         >
+          <template #icon>
+            <PhPlay :size="16" weight="fill" />
+          </template>
           运行选股
         </NButton>
       </div>
@@ -203,36 +222,23 @@ watch(selectedStrategy, async (val) => {
         class="w-52"
       >
         <template #prefix>
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            class="opacity-50"
-          >
-            <circle cx="11" cy="11" r="8" />
-            <path d="m21 21-4.3-4.3" />
-          </svg>
+          <PhMagnifyingGlass
+            :size="14"
+            class="text-[var(--color-text-muted)]"
+          />
         </template>
       </NInput>
 
       <!-- Stats -->
-      <div
-        class="flex items-center gap-3 text-sm text-[var(--color-text-secondary)]"
-      >
+      <div class="flex items-center gap-3 text-sm text-[var(--color-text-secondary)]">
         <span>{{ today }}</span>
         <span
           v-if="searchText && filteredResults.length !== selectionStore.results.length"
-          class="font-mono font-medium"
+          class="data-mono font-medium"
         >
           {{ filteredResults.length }} / {{ selectionStore.results.length }} 只
         </span>
-        <span v-else class="font-mono font-medium">
+        <span v-else class="data-mono font-medium">
           {{ filteredResults.length }} 只
         </span>
       </div>
@@ -242,9 +248,7 @@ watch(selectedStrategy, async (val) => {
     <div class="flex gap-5 min-h-[600px]">
       <!-- Table -->
       <div class="flex-1 min-w-0">
-        <div
-          class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-lg overflow-hidden"
-        >
+        <div class="glass-panel overflow-hidden">
           <NDataTable
             :columns="columns"
             :data="filteredResults"
@@ -261,74 +265,74 @@ watch(selectedStrategy, async (val) => {
       </div>
 
       <!-- Right panel -->
-      <div
-        class="w-[400px] shrink-0 border-l border-[var(--color-border)] pl-5"
-      >
-        <!-- Selected stock detail -->
-        <template v-if="selectedStock">
-          <div class="flex items-baseline gap-2 mb-1">
-            <span
-              class="text-lg font-bold font-mono text-[var(--color-text-primary)]"
-            >
-              {{ selectedStock.ts_code }}
-            </span>
-          </div>
-          <div class="text-sm text-[var(--color-text-secondary)] mb-5">
-            排名 {{ selectedStock.rank }} · 评分
-            {{ selectedStock.composite_score.toFixed(2) }}
-          </div>
-          <FactorRadar
-            v-if="
-              selectedStock.factor_snapshot &&
-              Object.keys(selectedStock.factor_snapshot).length
-            "
-            :factors="selectedStock.factor_snapshot"
-          />
-          <NButton
-            type="primary"
-            ghost
-            class="mt-5"
-            @click="router.push(`/stock/${selectedStock.ts_code}`)"
-          >
-            查看详情
-          </NButton>
-        </template>
+      <div class="w-[400px] shrink-0">
+        <div class="glass-panel h-full overflow-y-auto">
+          <div class="p-5">
+            <!-- Selected stock detail -->
+            <template v-if="selectedStock">
+              <div class="flex items-baseline gap-2 mb-1">
+                <span class="text-lg font-bold data-mono text-[var(--color-text-primary)]">
+                  {{ selectedStock.ts_code }}
+                </span>
+                <NTag size="small" :bordered="false" type="info">
+                  #{{ selectedStock.rank }}
+                </NTag>
+              </div>
+              <div class="flex items-center gap-2 text-sm text-[var(--color-text-secondary)] mb-5">
+                <span>评分</span>
+                <span class="data-mono font-semibold text-[var(--color-text-primary)]">
+                  {{ selectedStock.composite_score.toFixed(2) }}
+                </span>
+                <span class="text-[var(--color-text-muted)]">|</span>
+                <span>{{ selectedStock.trade_date }}</span>
+              </div>
 
-        <!-- Empty state -->
-        <template v-else>
-          <div
-            class="flex flex-col items-center justify-center h-full text-center py-20"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="40"
-              height="40"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.4"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              class="text-[var(--color-text-secondary)] opacity-40 mb-4"
-            >
-              <path d="m3 3 7.07 16.97 2.51-7.39 7.39-2.51L3 3z" />
-              <path d="M13 13l6 6" />
-            </svg>
-            <p
-              class="text-sm text-[var(--color-text-secondary)] opacity-50 mt-1"
-            >
-              点击行查看因子画像
-            </p>
+              <!-- Factor radar -->
+              <FactorRadar
+                v-if="
+                  selectedStock.factor_snapshot &&
+                  Object.keys(selectedStock.factor_snapshot).length
+                "
+                :factors="selectedStock.factor_snapshot"
+                :theme="theme"
+              />
+
+              <NButton
+                type="primary"
+                ghost
+                class="mt-5 w-full"
+                @click="router.push(`/stock/${selectedStock.ts_code}`)"
+              >
+                查看详情
+              </NButton>
+            </template>
+
+            <!-- Empty state -->
+            <template v-else>
+              <div class="flex flex-col items-center justify-center h-full text-center py-20">
+                <PhCursorClick
+                  :size="40"
+                  class="text-[var(--color-text-muted)] opacity-40 mb-4"
+                />
+                <p class="text-sm text-[var(--color-text-secondary)] opacity-50">
+                  点击行查看因子画像
+                </p>
+              </div>
+            </template>
           </div>
-        </template>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.row-selected td {
-  background: rgba(20, 184, 166, 0.08) !important;
+/* Selected row: left accent border instead of full background */
+.row--selected td {
+  background: var(--color-accent-muted) !important;
+}
+.row--selected td:first-child {
+  box-shadow: inset 3px 0 0 var(--color-accent);
 }
 
 :deep(.n-data-table-tr:hover) td {
@@ -337,5 +341,14 @@ watch(selectedStrategy, async (val) => {
 
 :deep(.n-data-table-tr) {
   cursor: pointer;
+}
+
+/* Table header styling */
+:deep(.n-data-table-thead) {
+  background: var(--color-surface-inset) !important;
+}
+:deep(.n-data-table-th) {
+  color: var(--color-text-secondary) !important;
+  font-weight: 500;
 }
 </style>

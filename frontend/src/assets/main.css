@@ -4,50 +4,70 @@
   --font-sans: "Geist Sans", "PingFang SC", "Microsoft YaHei", sans-serif;
   --font-mono: "Geist Mono", monospace;
 
-  /* Semantic tokens - light mode (default) */
-  --color-surface: #FAFAFA;
-  --color-surface-elevated: #FFFFFF;
-  --color-surface-inset: #F4F4F5;
-  --color-border: #E4E4E7;
-  --color-border-muted: #D4D4D8;
-  --color-text-primary: #18181B;
-  --color-text-secondary: #71717A;
-  --color-text-muted: #A1A1AA;
+  /* Dark-tech semantic tokens (dark mode default - Bloomberg/TradingView palette) */
+  --color-surface: #0A0E17;
+  --color-surface-elevated: #111827;
+  --color-surface-inset: #1E293B;
+  --color-border: #1E293B;
+  --color-border-muted: #334155;
+  --color-text-primary: #F1F5F9;
+  --color-text-secondary: #94A3B8;
+  --color-text-muted: #64748B;
 
-  /* Brand + Semantic */
+  /* Brand: cyan accent for quant/tech feel */
+  --color-accent: #06B6D4;
+  --color-accent-hover: #22D3EE;
+  --color-accent-muted: rgba(6, 182, 212, 0.12);
+
+  /* Primary blue (keep) */
   --color-primary: #3B82F6;
   --color-primary-hover: #2563EB;
+
+  /* A-share: RED = UP, GREEN = DOWN */
   --color-up: #EF4444;
   --color-down: #22C55E;
-  --color-up-bg: #FEF2F2;
-  --color-down-bg: #F0FDF4;
+  --color-up-bg: rgba(239, 68, 68, 0.12);
+  --color-down-bg: rgba(34, 197, 94, 0.12);
 
-  /* Accent (teal-emerald for data/quant tool) */
-  --color-accent: #14B8A6;
-  --color-accent-hover: #0D9488;
-  --color-accent-muted: #E6FAF7;
+  /* Status colors */
+  --color-warning: #F59E0B;
+  --color-error: #EF4444;
+  --color-success: #22C55E;
 }
 
-/* Dark mode variant: scoped to .dark class on html element (Naive UI toggles this) */
+/* Dark mode variant for TailwindCSS dark: utilities */
 @variant dark (&:where(.dark, .dark *));
 
+/* :root defaults = dark mode (dark-first design) */
 :root {
-  --color-surface: #FAFAFA;
-  --color-surface-elevated: #FFFFFF;
-  --color-surface-inset: #F4F4F5;
+  --color-surface: #0A0E17;
+  --color-surface-elevated: #111827;
+  --color-surface-inset: #1E293B;
+  --color-border: #1E293B;
+  --color-border-muted: #334155;
+  --color-text-primary: #F1F5F9;
+  --color-text-secondary: #94A3B8;
+  --color-text-muted: #64748B;
+  --color-accent: #06B6D4;
+  --color-accent-hover: #22D3EE;
+  --color-accent-muted: rgba(6, 182, 212, 0.12);
 }
 
-html.dark {
-  --color-surface: #09090B;
-  --color-surface-elevated: #18181B;
-  --color-surface-inset: #1C1C1F;
-  --color-border: #27272A;
-  --color-border-muted: #3F3F46;
-  --color-text-primary: #FAFAFA;
-  --color-text-secondary: #A1A1AA;
-  --color-text-muted: #71717A;
-  --color-up-bg: #1C0B0B;
-  --color-down-bg: #0B1C0F;
+/* Light mode activated by removing .dark class */
+html:not(.dark) {
+  --color-surface: #F8FAFC;
+  --color-surface-elevated: #FFFFFF;
+  --color-surface-inset: #F1F5F9;
+  --color-border: #E2E8F0;
+  --color-border-muted: #CBD5E1;
+  --color-text-primary: #0F172A;
+  --color-text-secondary: #475569;
+  --color-text-muted: #94A3B8;
+  --color-accent: #0891B2;
+  --color-accent-hover: #06B6D4;
+  --color-accent-muted: rgba(8, 145, 178, 0.08);
+  --color-up-bg: #FEF2F2;
+  --color-down-bg: #F0FDF4;
 }
 
 * {
@@ -92,19 +112,23 @@ body {
   background-color: var(--color-down-bg);
 }
 
-/* Scrollbar styling for dark mode */
-html.dark ::-webkit-scrollbar {
+/* Scrollbar styling (dark-tech aesthetic) */
+::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
-html.dark ::-webkit-scrollbar-track {
+::-webkit-scrollbar-track {
   background: transparent;
 }
 
-html.dark ::-webkit-scrollbar-thumb {
-  background: #3F3F46;
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-muted);
   border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
 }
 
 /* ===== Typography ===== */
@@ -129,7 +153,7 @@ h1, h2 {
 
 /* Visible focus ring for keyboard navigation (a11y requirement) */
 :focus-visible {
-  outline: 2px solid var(--color-accent, #14B8A6);
+  outline: 2px solid var(--color-accent, #06B6D4);
   outline-offset: 2px;
 }
 
@@ -186,4 +210,20 @@ button:active:not(:disabled),
   font-size: 14px;
   z-index: 100;
   text-decoration: none;
+}
+
+/* ===== Dark-tech utility classes ===== */
+
+/* Glass panel: elevated surface with border, rounded corners */
+.glass-panel {
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+/* Monospaced tabular numbers for financial data */
+.data-mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
 }

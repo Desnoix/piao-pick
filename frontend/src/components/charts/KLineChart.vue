@@ -12,6 +12,7 @@ import {
 } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 import type { Kline } from '../../types/stock'
+import { useChartTheme } from '../../composables/use-chart-theme'
 
 use([
   CandlestickChart,
@@ -24,6 +25,8 @@ use([
   LegendComponent,
   CanvasRenderer,
 ])
+
+const { theme } = useChartTheme()
 
 const props = defineProps<{
   data: Kline[]
@@ -39,27 +42,64 @@ const option = computed(() => {
   const ma20 = calculateMA(closes, 20)
   const ma60 = calculateMA(closes, 60)
 
+  // Volume colors: red for up candles, green for down (A-share convention)
+  const volumeData = props.data.map((k) => ({
+    value: k.volume ?? 0,
+    itemStyle: {
+      color: (k.close ?? 0) >= (k.open ?? 0) ? 'rgba(239,68,68,0.6)' : 'rgba(34,197,94,0.6)',
+    },
+  }))
+
   return {
-    animation: false,
+    animation: true,
+    animationDuration: 600,
+    animationEasing: 'cubicOut' as const,
     tooltip: {
       trigger: 'axis',
       axisPointer: { type: 'cross' },
+      backgroundColor: theme.value.tooltip.backgroundColor,
+      borderColor: theme.value.tooltip.borderColor,
+      textStyle: theme.value.tooltip.textStyle,
     },
     legend: {
       data: ['K线', 'MA20', 'MA60'],
       top: 10,
+      textStyle: { color: theme.value.legend.textStyle.color },
     },
     grid: [
       { left: '10%', right: '5%', top: '15%', height: '55%' },
       { left: '10%', right: '5%', top: '75%', height: '15%' },
     ],
     xAxis: [
-      { type: 'category', data: dates, gridIndex: 0, axisLabel: { show: false } },
-      { type: 'category', data: dates, gridIndex: 1 },
+      {
+        type: 'category',
+        data: dates,
+        gridIndex: 0,
+        axisLabel: { show: false },
+        axisLine: { lineStyle: { color: theme.value.axisLine.lineStyle.color } },
+      },
+      {
+        type: 'category',
+        data: dates,
+        gridIndex: 1,
+        axisLine: { lineStyle: { color: theme.value.axisLine.lineStyle.color } },
+        axisLabel: { color: theme.value.axisLabel.color },
+      },
     ],
     yAxis: [
-      { scale: true, gridIndex: 0 },
-      { scale: true, gridIndex: 1, axisLabel: { show: false } },
+      {
+        scale: true,
+        gridIndex: 0,
+        axisLine: { lineStyle: { color: theme.value.axisLine.lineStyle.color } },
+        axisLabel: { color: theme.value.axisLabel.color },
+        splitLine: { lineStyle: { color: theme.value.splitLine.lineStyle.color } },
+      },
+      {
+        scale: true,
+        gridIndex: 1,
+        axisLabel: { show: false },
+        axisLine: { lineStyle: { color: theme.value.axisLine.lineStyle.color } },
+      },
     ],
     dataZoom: [
       { type: 'inside', xAxisIndex: [0, 1], start: 70, end: 100 },
@@ -86,7 +126,8 @@ const option = computed(() => {
         xAxisIndex: 0,
         yAxisIndex: 0,
         smooth: true,
-        lineStyle: { width: 1 },
+        lineStyle: { width: 1, color: theme.value.color[0] },
+        itemStyle: { color: theme.value.color[0] },
         symbol: 'none',
       },
       {
@@ -96,13 +137,14 @@ const option = computed(() => {
         xAxisIndex: 0,
         yAxisIndex: 0,
         smooth: true,
-        lineStyle: { width: 1 },
+        lineStyle: { width: 1, color: theme.value.color[1] },
+        itemStyle: { color: theme.value.color[1] },
         symbol: 'none',
       },
       {
         name: '成交量',
         type: 'bar',
-        data: volumes,
+        data: volumeData,
         xAxisIndex: 1,
         yAxisIndex: 1,
       },
