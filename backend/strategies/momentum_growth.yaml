@@ -1,0 +1,57 @@
+# 策略配置：动量成长
+# 核心理念：强势动量 + 高成长 + 资金流入
+
+name: momentum_growth
+display_name: 动量成长
+description: 强势动量 + 高成长 + 资金流入，适合进取型投资者
+category: momentum
+version: "1.0"
+default_active: true
+default_priority: 20
+
+# 股票池过滤规则
+universe:
+  exclude_st: true                  # 排除 ST 股票
+  exclude_new_listing_days: 120     # 排除上市不足 120 天的次新股
+  exclude_suspended: true           # 排除停牌股票
+  exclude_bse: true                 # 排除北交所股票
+  min_market_cap: 5000000000        # 最小市值 50 亿
+  min_daily_amount: 20000000        # 最小日均成交额 2000 万
+
+# 因子配置
+factors:
+  - id: ret_20d
+    name: "20日收益率"
+    weight: 0.25
+    direction: positive             # 强动量
+  - id: turnover_20d
+    name: "20日换手率"
+    weight: 0.10
+    direction: positive             # 活跃交易
+  - id: rev_growth_yoy
+    name: "营收同比增长率"
+    weight: 0.25
+    direction: positive             # 高成长
+  - id: ear_growth_yoy
+    name: "利润同比增长率"
+    weight: 0.20
+    direction: positive             # 高成长
+  - id: inst_holding_chg
+    name: "机构持仓变动"
+    weight: 0.10
+    direction: positive             # 机构加仓
+  - id: ln_market_cap
+    name: "市值对数"
+    weight: 0.10
+    direction: negative             # 偏好中盘
+
+# 过滤器
+filters:
+  - type: percentile_top
+    count: 80                       # 先取前 80 名
+  - type: industry_diversify
+    max_per_industry: 8             # 每行业最多 8 只（允许集中）
+
+# 输出配置
+output:
+  max_stocks: 20                    # 最终输出最多 20 只

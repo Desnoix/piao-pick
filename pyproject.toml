@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "piao-pick"
+version = "0.1.0"
+description = "A股量化选股系统"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.27.0",
+    "pandas>=2.0.0",
+    "numpy>=1.24.0",
+    "scipy>=1.11.0",
+    "statsmodels>=0.14.0",
+    "akshare>=1.12.0",
+    "tushare>=1.2.0",
+    "sqlmodel>=0.0.14",
+    "sqlalchemy>=2.0.0",
+    "apscheduler>=3.10.0",
+    "exchange-calendars>=4.5.0",
+    "python-dotenv>=1.0.0",
+    "pyyaml>=6.0",
+    "pydantic>=2.0.0",
+    "httpx>=0.25.0",
+]

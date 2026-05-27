@@ -1,0 +1,57 @@
+# 策略配置：价值低波
+# 核心理念：低估值 + 低波动 + 高质量
+
+name: value_lowvol
+display_name: 价值低波
+description: 低估值 + 低波动 + 高质量，适合稳健型投资者
+category: value
+version: "1.0"
+default_active: true
+default_priority: 10
+
+# 股票池过滤规则
+universe:
+  exclude_st: true                  # 排除 ST 股票
+  exclude_new_listing_days: 60      # 排除上市不足 60 天的次新股
+  exclude_suspended: true           # 排除停牌股票
+  exclude_bse: true                 # 排除北交所股票
+  min_market_cap: 2000000000        # 最小市值 20 亿
+  min_daily_amount: 5000000         # 最小日均成交额 500 万
+
+# 因子配置
+factors:
+  - id: pe_ttm
+    name: "PE(TTM)"
+    weight: 0.20
+    direction: negative             # 越低越好
+  - id: pb
+    name: "PB"
+    weight: 0.15
+    direction: negative             # 越低越好
+  - id: fcf_yield
+    name: "自由现金流收益率"
+    weight: 0.15
+    direction: positive             # 越高越好
+  - id: ret_60d_vol
+    name: "60日波动率"
+    weight: 0.15
+    direction: negative             # 低波动
+  - id: roe_ttm
+    name: "ROE(TTM)"
+    weight: 0.20
+    direction: positive             # 高质量
+  - id: gross_margin
+    name: "毛利率"
+    weight: 0.15
+    direction: positive             # 高质量
+
+# 过滤器
+filters:
+  - type: percentile_top
+    count: 100                      # 先取前 100 名
+  - type: industry_diversify
+    max_per_industry: 5             # 每行业最多 5 只
+
+# 输出配置
+output:
+  max_stocks: 30                    # 最终输出最多 30 只

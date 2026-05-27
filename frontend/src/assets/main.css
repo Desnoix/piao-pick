@@ -1,0 +1,189 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Geist Sans", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-mono: "Geist Mono", monospace;
+
+  /* Semantic tokens - light mode (default) */
+  --color-surface: #FAFAFA;
+  --color-surface-elevated: #FFFFFF;
+  --color-surface-inset: #F4F4F5;
+  --color-border: #E4E4E7;
+  --color-border-muted: #D4D4D8;
+  --color-text-primary: #18181B;
+  --color-text-secondary: #71717A;
+  --color-text-muted: #A1A1AA;
+
+  /* Brand + Semantic */
+  --color-primary: #3B82F6;
+  --color-primary-hover: #2563EB;
+  --color-up: #EF4444;
+  --color-down: #22C55E;
+  --color-up-bg: #FEF2F2;
+  --color-down-bg: #F0FDF4;
+
+  /* Accent (teal-emerald for data/quant tool) */
+  --color-accent: #14B8A6;
+  --color-accent-hover: #0D9488;
+  --color-accent-muted: #E6FAF7;
+}
+
+/* Dark mode variant: scoped to .dark class on html element (Naive UI toggles this) */
+@variant dark (&:where(.dark, .dark *));
+
+:root {
+  --color-surface: #FAFAFA;
+  --color-surface-elevated: #FFFFFF;
+  --color-surface-inset: #F4F4F5;
+}
+
+html.dark {
+  --color-surface: #09090B;
+  --color-surface-elevated: #18181B;
+  --color-surface-inset: #1C1C1F;
+  --color-border: #27272A;
+  --color-border-muted: #3F3F46;
+  --color-text-primary: #FAFAFA;
+  --color-text-secondary: #A1A1AA;
+  --color-text-muted: #71717A;
+  --color-up-bg: #1C0B0B;
+  --color-down-bg: #0B1C0F;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-sans);
+  background-color: var(--color-surface);
+  color: var(--color-text-primary);
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+/* A-share convention: red=up, green=down */
+.text-up {
+  color: var(--color-up);
+}
+
+.text-down {
+  color: var(--color-down);
+}
+
+.bg-up {
+  background-color: var(--color-up);
+}
+
+.bg-down {
+  background-color: var(--color-down);
+}
+
+.bg-up-bg {
+  background-color: var(--color-up-bg);
+}
+
+.bg-down-bg {
+  background-color: var(--color-down-bg);
+}
+
+/* Scrollbar styling for dark mode */
+html.dark ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+html.dark ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+html.dark ::-webkit-scrollbar-thumb {
+  background: #3F3F46;
+  border-radius: 4px;
+}
+
+/* ===== Typography ===== */
+
+/* Tabular figures: aligns numbers in columns for quant data */
+.font-mono,
+.n-data-table-cell .font-mono {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Display text: tighter letter-spacing for weight + presence */
+h1, h2, h3 {
+  letter-spacing: -0.02em;
+}
+
+/* Prevent orphan words in headings */
+h1, h2 {
+  text-wrap: balance;
+}
+
+/* ===== Accessibility ===== */
+
+/* Visible focus ring for keyboard navigation (a11y requirement) */
+:focus-visible {
+  outline: 2px solid var(--color-accent, #14B8A6);
+  outline-offset: 2px;
+}
+
+/* Remove focus ring for mouse users */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* ===== Interactions ===== */
+
+/* Tactile press feedback on buttons */
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]) {
+  transition: transform 0.08s ease, background-color 0.15s ease;
+}
+
+button:active:not(:disabled),
+[role="button"]:active:not([aria-disabled="true"]) {
+  transform: scale(0.98);
+}
+
+/* ===== Page transitions ===== */
+.page-fade-enter-active,
+.page-fade-leave-active {
+  transition: opacity 0.12s ease;
+}
+
+.page-fade-enter-from,
+.page-fade-leave-to {
+  opacity: 0;
+}
+
+/* ===== A11y: skip link ===== */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: auto;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.skip-link:focus {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  width: auto;
+  height: auto;
+  padding: 8px 16px;
+  background: var(--color-surface-elevated);
+  color: var(--color-accent);
+  border: 1px solid var(--color-accent);
+  border-radius: 6px;
+  font-size: 14px;
+  z-index: 100;
+  text-decoration: none;
+}
