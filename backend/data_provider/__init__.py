@@ -6,11 +6,15 @@ Exports:
 - DataFetcherManager: Strategy manager with auto-failover
 - normalize_stock_code: Normalize A-share stock codes
 - canonical_stock_code: Canonical uppercase stock code form
-- AkshareFetcher: Primary data source (East Money via akshare)
+- MootdxFetcher: Primary data source (TDX TCP, immune to HTTP anti-bot)
+- AkshareFetcher: HTTP data source (East Money via akshare)
 - TushareFetcher: Backup data source (Tushare Pro API)
 """
 
 from .akshare_fetcher import AkshareFetcher
+from .baostock_fetcher import BaostockFetcher
+from .jqdata_fetcher import JQDataFetcher
+from .mootdx_fetcher import MootdxFetcher
 from .base import (
     STANDARD_COLUMNS,
     BaseFetcher,
@@ -37,5 +41,8 @@ __all__ = [
     "is_st_stock",
     "is_kc_cy_stock",
     "AkshareFetcher",
+    "BaostockFetcher",
+    "JQDataFetcher",
+    "MootdxFetcher",
     "TushareFetcher",
 ]

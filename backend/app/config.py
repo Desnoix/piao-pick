@@ -179,6 +179,10 @@ class Config:
     # === Data source API tokens ===
     tushare_token: str | None = None
 
+    # === JQData ===
+    jqdata_token: str | None = None
+    jqdata_password: str | None = None
+
     # === Scheduling ===
     schedule_enabled: bool = False
     schedule_time: str = "18:00"
@@ -263,6 +267,8 @@ class Config:
         config = cls(
             db_path=os.getenv("DB_PATH", "./data/piao_pick.db"),
             tushare_token=os.getenv("TUSHARE_TOKEN", "").strip() or None,
+            jqdata_token=os.getenv("JQDATA_TOKEN", "").strip() or None,
+            jqdata_password=os.getenv("JQDATA_PASSWORD", "").strip() or None,
             schedule_enabled=parse_env_bool(os.getenv("SCHEDULE_ENABLED"), default=False),
             schedule_time=os.getenv("SCHEDULE_TIME", "18:00"),
             max_workers=parse_env_int(

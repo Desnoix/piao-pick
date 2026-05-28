@@ -15,6 +15,7 @@ from app.api.v1 import (
     history_sync,
     market,
     selection,
+    settings,
     stocks,
     strategies,
 )
@@ -22,8 +23,8 @@ from app.api.v1 import (
 router = APIRouter(prefix="/api/v1")
 
 router.include_router(stocks.router, prefix="/stocks", tags=["Stocks"])
-router.include_router(strategies.router, prefix="/strategies", tags=["Strategies"])
 router.include_router(factor_coverage.router, prefix="/strategies", tags=["Strategies"])
+router.include_router(strategies.router, prefix="/strategies", tags=["Strategies"])
 router.include_router(selection.router, prefix="/selection", tags=["Selection"])
 router.include_router(backtest.router, prefix="/backtest", tags=["Backtest"])
 router.include_router(data_status.router, prefix="/data", tags=["Data"])
@@ -31,3 +32,4 @@ router.include_router(history_sync.router, prefix="/data", tags=["Data"])
 router.include_router(market.router, prefix="/market", tags=["Market"])
 router.include_router(data_quality.router, prefix="/data-quality", tags=["DataQuality"])
 router.include_router(cache_stats.router, prefix="/data", tags=["缓存"])
+router.include_router(settings.router, prefix="/settings", tags=["Settings"])

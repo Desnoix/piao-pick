@@ -15,6 +15,7 @@ from app.models.kline import Kline
 from app.repositories.history_sync_repo import HistorySyncRepository
 from app.repositories.stock_repo import StockRepository
 from app.services.cache import get_cache_manager
+from data_provider import DataFetcherManager, DataFetchError
 
 logger = logging.getLogger(__name__)
 
@@ -22,12 +23,26 @@ logger = logging.getLogger(__name__)
 class HistoricalDataService:
     """历史数据同步服务"""
 
+    _fetcher_manager: DataFetcherManager | None = None
+
     def __init__(self):
         self.db = get_db()
         self.stock_repo = StockRepository(self.db)
         self.sync_repo = HistorySyncRepository(self.db)
         self._executor = ThreadPoolExecutor(max_workers=1)
         self._current_future = None
+
+    @classmethod
+    def _get_fetcher_manager(cls) -> DataFetcherManager:
+        """Lazily create and cache DataFetcherManager singleton.
+
+        Creating a new DataFetcherManager per stock is expensive (it initializes
+        fetchers). Cache at class level so all HistoricalDataService instances
+        share the same manager with its configured failover chain.
+        """
+        if cls._fetcher_manager is None:
+            cls._fetcher_manager = DataFetcherManager()
+        return cls._fetcher_manager
 
     def start_sync(
         self,
@@ -164,30 +179,28 @@ class HistoricalDataService:
         """
         拉取并保存单只股票的历史数据
 
+        Uses DataFetcherManager's automatic failover chain
+        (Baostock P0 → Akshare P1 → Tushare P2) instead of raw akshare calls.
+
         Returns:
             成功写入的K线数量
         """
         try:
-            import akshare as ak
-
-            # 尝试东方财富接口
-            df = ak.stock_zh_a_hist(
-                symbol=ts_code,
-                period="daily",
-                start_date=start_date.replace("-", ""),
-                end_date=end_date.replace("-", ""),
-                adjust=adjust_type,
+            manager = self._get_fetcher_manager()
+            df, source_name = manager.get_daily_data(
+                ts_code,
+                start_date=start_date,
+                end_date=end_date,
             )
 
             if df is None or df.empty:
-                logger.debug(f"{ts_code}: No data returned")
+                logger.debug(f"{ts_code}: No data returned from any source")
                 return 0
 
-            # 标准化列名
-            df = self._normalize_columns(df, ts_code)
-
-            # 保存到数据库
-            klines = self._dataframe_to_klines(df, ts_code, source="eastmoney")
+            # df already has standardized columns from DataFetcherManager:
+            # code, date, open, high, low, close, volume, amount,
+            # pct_chg, ma5, ma10, ma20, volume_ratio
+            klines = self._dataframe_to_klines(df, ts_code, source=source_name)
             saved_count = self.stock_repo.upsert_kline_batch(klines)
 
             # 失效缓存
@@ -197,101 +210,9 @@ class HistoricalDataService:
 
             return saved_count
 
-        except Exception as e:
-            # 东方财富失败，尝试新浪
-            logger.debug(f"{ts_code}: Eastmoney failed ({e}), trying Sina")
-            return self._fetch_from_sina(ts_code, start_date, end_date, adjust_type)
-
-    def _fetch_from_sina(
-        self,
-        ts_code: str,
-        start_date: str,
-        end_date: str,
-        adjust_type: str,
-    ) -> int:
-        """备用数据源：新浪财经"""
-        try:
-            import akshare as ak
-
-            df = ak.stock_zh_a_daily(
-                symbol=f"sh{ts_code}" if ts_code.startswith("6") else f"sz{ts_code}",
-                adjust=adjust_type,
-            )
-
-            if df is None or df.empty:
-                return 0
-
-            # 过滤日期范围
-            df["date"] = pd.to_datetime(df["date"])
-            start_dt = pd.to_datetime(start_date)
-            end_dt = pd.to_datetime(end_date)
-            df = df[(df["date"] >= start_dt) & (df["date"] <= end_dt)]
-
-            # 标准化
-            df = self._normalize_columns(df, ts_code, source="sina")
-
-            # 保存
-            klines = self._dataframe_to_klines(df, ts_code, source="sina")
-            saved_count = self.stock_repo.upsert_kline_batch(klines)
-
-            return saved_count
-
-        except Exception as e:
-            logger.warning(f"{ts_code}: Both sources failed, Sina error: {e}")
+        except DataFetchError as e:
+            logger.warning(f"{ts_code}: All data sources failed: {e}")
             raise
-
-    def _normalize_columns(self, df: pd.DataFrame, ts_code: str, source: str = "eastmoney") -> pd.DataFrame:
-        """标准化 DataFrame 列名"""
-        df = df.copy()
-
-        if source == "eastmoney":
-            # 东方财富列名映射
-            column_mapping = {
-                "日期": "date",
-                "开盘": "open",
-                "收盘": "close",
-                "最高": "high",
-                "最低": "low",
-                "成交量": "volume",
-                "成交额": "amount",
-                "振幅": "amplitude",
-                "涨跌幅": "pct_change",
-                "涨跌额": "change",
-                "换手率": "turnover",
-            }
-            df = df.rename(columns=column_mapping)
-
-        elif source == "sina":
-            # 新浪列名已经是英文/拼音，直接映射
-            column_mapping = {
-                "date": "date",
-                "open": "open",
-                "close": "close",
-                "high": "high",
-                "low": "low",
-                "volume": "volume",
-            }
-            df = df.rename(columns=column_mapping)
-
-        # 确保必需的列存在
-        required_cols = ["date", "open", "close", "high", "low", "volume"]
-        for col in required_cols:
-            if col not in df.columns:
-                df[col] = None
-
-        # 转换日期格式
-        df["date"] = pd.to_datetime(df["date"]).dt.strftime("%Y-%m-%d")
-
-        # 选择需要的列
-        keep_cols = ["date", "open", "high", "low", "close", "volume"]
-        optional_cols = ["amount", "pct_change", "turnover"]
-        for col in optional_cols:
-            if col in df.columns:
-                keep_cols.append(col)
-
-        df = df[keep_cols]
-
-        return df
 
     def _dataframe_to_klines(
         self,
@@ -299,14 +220,21 @@ class HistoricalDataService:
         ts_code: str,
         source: str,
     ) -> list[Kline]:
-        """将 DataFrame 转换为 Kline 对象列表"""
+        """将标准化 DataFrame 转换为 Kline 对象列表
+
+        Expects DataFetcherManager output columns:
+        code, date, open, high, low, close, volume, amount,
+        pct_chg, ma5, ma10, ma20, volume_ratio
+        """
         klines = []
 
         for _, row in df.iterrows():
             try:
+                trade_date = row["date"].strftime("%Y-%m-%d")
+
                 kline = Kline(
                     ts_code=ts_code,
-                    trade_date=row["date"],
+                    trade_date=trade_date,
                     open=float(row["open"]) if pd.notna(row["open"]) else None,
                     high=float(row["high"]) if pd.notna(row["high"]) else None,
                     low=float(row["low"]) if pd.notna(row["low"]) else None,
@@ -314,6 +242,10 @@ class HistoricalDataService:
                     volume=int(row["volume"]) if pd.notna(row["volume"]) else None,
                     amount=float(row["amount"]) if "amount" in row and pd.notna(row["amount"]) else None,
                     close_adj=float(row["close"]) if pd.notna(row["close"]) else None,  # 已复权
+                    ma5=float(row["ma5"]) if "ma5" in row and pd.notna(row["ma5"]) else None,
+                    ma10=float(row["ma10"]) if "ma10" in row and pd.notna(row["ma10"]) else None,
+                    ma20=float(row["ma20"]) if "ma20" in row and pd.notna(row["ma20"]) else None,
+                    volume_ratio=float(row["volume_ratio"]) if "volume_ratio" in row and pd.notna(row["volume_ratio"]) else None,
                     data_source=source,
                 )
                 klines.append(kline)

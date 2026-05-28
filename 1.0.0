@@ -1,0 +1,10 @@
+Collecting baostock
+  Using cached baostock-0.9.1-py3-none-any.whl.metadata (3.5 kB)
+Requirement already satisfied: pandas>=0.18.0 in c:\users\desnoix\.pyenv\pyenv-win\versions\3.11.8\lib\site-packages (from baostock) (3.0.2)
+Requirement already satisfied: numpy>=1.26.0 in c:\users\desnoix\.pyenv\pyenv-win\versions\3.11.8\lib\site-packages (from pandas>=0.18.0->baostock) (2.4.4)
+Requirement already satisfied: python-dateutil>=2.8.2 in c:\users\desnoix\.pyenv\pyenv-win\versions\3.11.8\lib\site-packages (from pandas>=0.18.0->baostock) (2.9.0.post0)
+Requirement already satisfied: tzdata in c:\users\desnoix\.pyenv\pyenv-win\versions\3.11.8\lib\site-packages (from pandas>=0.18.0->baostock) (2026.2)
+Requirement already satisfied: six>=1.5 in c:\users\desnoix\.pyenv\pyenv-win\versions\3.11.8\lib\site-packages (from python-dateutil>=2.8.2->pandas>=0.18.0->baostock) (1.17.0)
+Using cached baostock-0.9.1-py3-none-any.whl (47 kB)
+Installing collected packages: baostock
+Successfully installed baostock-0.9.1

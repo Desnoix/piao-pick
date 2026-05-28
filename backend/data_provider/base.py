@@ -464,18 +464,24 @@ class DataFetcherManager:
         Initialize default data source list.
 
         Priority:
-          0. AkshareFetcher (Priority 0) - highest priority
-          1. TushareFetcher (Priority 1)
+          0. MootdxFetcher (Priority 0) - TDX TCP, immune to HTTP anti-bot
+          1. BaostockFetcher (Priority 0) - same priority, fallback
+          2. AkshareFetcher (Priority 1) - East Money HTTP
+          3. TushareFetcher (Priority 2) - requires token
         """
         from .akshare_fetcher import AkshareFetcher
+        from .baostock_fetcher import BaostockFetcher
+        from .mootdx_fetcher import MootdxFetcher
         from .tushare_fetcher import TushareFetcher
 
+        mootdx = MootdxFetcher()
+        baostock = BaostockFetcher()
         akshare = AkshareFetcher()
         tushare = TushareFetcher()
 
         self._ensure_concurrency_guards()
         with self._fetchers_lock:
-            self._fetchers = [akshare, tushare]
+            self._fetchers = [mootdx, baostock, akshare, tushare]
             self._fetchers.sort(key=lambda f: f.priority)
 
         priority_info = ", ".join([f"{f.name}(P{f.priority})" for f in self._get_fetchers_snapshot()])

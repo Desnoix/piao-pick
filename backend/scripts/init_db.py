@@ -18,6 +18,60 @@ if str(_backend_dir) not in sys.path:
     sys.path.insert(0, str(_backend_dir))
 
 
+def _perform_index_migrations(db, logger):
+    """创建性能优化索引 (幂等, 使用 IF NOT EXISTS)。"""
+    import logging as _logging
+    from sqlalchemy import text
+
+    # 查询频繁模式的覆盖索引
+    indexes: dict[str, str] = {
+        # kline_daily: 按日期查询全市场行情 (data_status, backtest, factor_compute)
+        "idx_kline_trade_date": "CREATE INDEX IF NOT EXISTS idx_kline_trade_date ON kline_daily(trade_date)",
+        # factor_daily: 按日期查询全市场因子 (selection, backtest, data_status)
+        "idx_factor_trade_date": "CREATE INDEX IF NOT EXISTS idx_factor_trade_date ON factor_daily(trade_date)",
+        # stock_info: 关键词模糊搜索 (list_stocks)
+        "idx_stock_name": "CREATE INDEX IF NOT EXISTS idx_stock_name ON stock_info(name)",
+        # selection_results: 按策略+日期联合查询 (selection results 端点)
+        "idx_selection_strategy_date": (
+            "CREATE INDEX IF NOT EXISTS idx_selection_strategy_date "
+            "ON selection_results(strategy_id, trade_date)"
+        ),
+        # history_sync_tasks: 按状态查询 (history_sync 轮询)
+        "idx_history_sync_status": (
+            "CREATE INDEX IF NOT EXISTS idx_history_sync_status "
+            "ON history_sync_tasks(status)"
+        ),
+    }
+
+    try:
+        with db.get_session() as session:
+            existing = {row[0] for row in session.execute(text(
+                "SELECT name FROM sqlite_master WHERE type='index'"
+            )).fetchall()}
+    except Exception as e:
+        logger.warning(f"Failed to query existing indexes: {e}")
+        existing = set()
+
+    created = 0
+    for name, ddl in indexes.items():
+        if name in existing:
+            logger.debug(f"✓ Index {name} already exists")
+            continue
+        try:
+            with db.get_session() as session:
+                session.execute(text(ddl))
+                session.commit()
+            created += 1
+            logger.info(f"✓ Created index: {name}")
+        except Exception as e:
+            logger.warning(f"Failed to create index {name}: {e}")
+
+    if created > 0:
+        logger.info(f"Created {created} new index(es)")
+    else:
+        logger.info("All performance indexes already present")
+
+
 def main():
     logging.basicConfig(
         level=logging.INFO,
@@ -57,6 +111,9 @@ def main():
                 logger.info("✓ turnover_rate column already present")
     except Exception as e:
         logger.warning(f"Migration check failed (non-fatal): {e}")
+
+    # 创建性能索引 (幂等 - IF NOT EXISTS)
+    _perform_index_migrations(db, logger)
 
     # 加载策略到数据库（可选）
     try:

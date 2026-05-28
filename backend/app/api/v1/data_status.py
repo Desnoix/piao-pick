@@ -15,6 +15,7 @@ from pydantic import BaseModel
 
 from app.database import get_db
 from app.repositories import StockRepository
+from app.services.cache import get_cache_manager
 
 logger = logging.getLogger(__name__)
 
@@ -41,45 +42,49 @@ class SyncResponse(BaseModel):
 
 @router.get("/status", summary="数据库状态")
 async def get_data_status():
-    """获取数据库状态和数据概览"""
-    db = get_db()
-    repo = _get_stock_repo()
+    """获取数据库状态和数据概览 (缓存 5 分钟, 避免重复全表扫描)"""
+    cm = get_cache_manager()
 
-    # DB file size
-    db_size_mb = None
-    if os.path.exists(db.db_path):
-        db_size_mb = round(os.path.getsize(db.db_path) / (1024 * 1024), 2)
+    def _loader():
+        """加载数据库概览 (在缓存未命中时执行)"""
+        db = get_db()
+        repo = _get_stock_repo()
 
-    # Stock count
-    stock_count = len(repo.get_all_stock_codes())
+        # DB file size
+        db_size_mb = None
+        if os.path.exists(db.db_path):
+            db_size_mb = round(os.path.getsize(db.db_path) / (1024 * 1024), 2)
 
-    # Latest kline date
-    latest_kline_date = None
-    with db.get_session() as session:
-        from sqlmodel import select
+        # Stock count — use cached method
+        from app.repositories import StockRepository as SR
+        repo_cached = SR(db)
+        df = repo_cached.get_all_stock_info_df()
+        stock_count = len(df) if df is not None else len(repo.get_all_stock_codes())
 
-        from app.models import Kline
+        # Latest kline date — single session, single query
+        latest_kline_date = None
+        latest_factor_date = None
+        with db.get_session() as session:
+            from sqlmodel import select
+            from app.models import Kline, Factor
 
-        statement = select(Kline.trade_date).order_by(Kline.trade_date.desc()).limit(1)
-        latest_kline_date = session.exec(statement).first()
+            latest_kline_date = session.exec(
+                select(Kline.trade_date).order_by(Kline.trade_date.desc()).limit(1)
+            ).first()
 
-    # Latest factor date
-    latest_factor_date = None
-    with db.get_session() as session:
-        from sqlmodel import select
+            latest_factor_date = session.exec(
+                select(Factor.trade_date).order_by(Factor.trade_date.desc()).limit(1)
+            ).first()
 
-        from app.models import Factor
+        return {
+            "db_path": db.db_path,
+            "db_size_mb": db_size_mb,
+            "stock_count": stock_count,
+            "latest_kline_date": latest_kline_date,
+            "latest_factor_date": latest_factor_date,
+        }
 
-        statement = select(Factor.trade_date).order_by(Factor.trade_date.desc()).limit(1)
-        latest_factor_date = session.exec(statement).first()
-
-    return {
-        "db_path": db.db_path,
-        "db_size_mb": db_size_mb,
-        "stock_count": stock_count,
-        "latest_kline_date": latest_kline_date,
-        "latest_factor_date": latest_factor_date,
-    }
+    return cm.get("data_status", "overview", category="hot", loader_fn=_loader)
 
 
 @router.post("/sync", summary="手动触发数据同步")
@@ -90,12 +95,15 @@ async def sync_data(req: SyncRequest):
     使用 ak.stock_zh_a_spot_em() 一次拉取全A股快照，
     写入 stock_info / kline_daily / factor_daily。
     """
+    import asyncio
+
     try:
         from app.services.data_preparation import DataPreparationService
 
         db = get_db()
         service = DataPreparationService(db)
-        result = service.prepare(trade_date=req.trade_date)
+        # 同步到线程池以免阻塞事件循环
+        result = await asyncio.to_thread(service.prepare, trade_date=req.trade_date)
         return SyncResponse(
             success=True,
             message=(
@@ -133,20 +141,26 @@ async def get_trade_calendar(
     if end_date is None:
         end_date = (datetime.now() + timedelta(days=30)).strftime("%Y-%m-%d")
 
-    try:
-        import exchange_calendars as xcals
+    cm = get_cache_manager()
+    cache_key = f"{start_date}:{end_date}"
 
-        xshg = xcals.get_calendar("XSHG")
-        start = datetime.strptime(start_date, "%Y-%m-%d")
-        end = datetime.strptime(end_date, "%Y-%m-%d")
-        sessions = xshg.sessions_in_range(start, end)
-        trading_days = [s.strftime("%Y-%m-%d") for s in sessions]
-    except ImportError:
-        # Fallback: weekdays only
-        trading_days = _get_weekdays(start_date, end_date)
-    except Exception as e:
-        logger.warning(f"exchange_calendars failed, using weekday fallback: {e}")
-        trading_days = _get_weekdays(start_date, end_date)
+    def _loader():
+        try:
+            import exchange_calendars as xcals
+
+            xshg = xcals.get_calendar("XSHG")
+            start = datetime.strptime(start_date, "%Y-%m-%d")
+            end = datetime.strptime(end_date, "%Y-%m-%d")
+            sessions = xshg.sessions_in_range(start, end)
+            trading_days = [s.strftime("%Y-%m-%d") for s in sessions]
+        except ImportError:
+            trading_days = _get_weekdays(start_date, end_date)
+        except Exception as e:
+            logger.warning(f"exchange_calendars failed, using weekday fallback: {e}")
+            trading_days = _get_weekdays(start_date, end_date)
+        return trading_days
+
+    trading_days = cm.get("trade_calendar", cache_key, category="config", loader_fn=_loader)
 
     return {
         "start_date": start_date,
