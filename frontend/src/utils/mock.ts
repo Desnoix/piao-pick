@@ -4,7 +4,11 @@ import { FACTOR_LABELS } from './constants'
 /**
  * 生成模拟K线数据（随机漫步）
  */
-export function generateMockKline(days: number = 60, basePrice: number = 100, tsCode: string = '000000.SZ'): Kline[] {
+export function generateMockKline(
+  days: number = 60,
+  basePrice: number = 100,
+  tsCode: string = '000000.SZ'
+): Kline[] {
   const result: Kline[] = []
   let price = basePrice
   const now = new Date()
@@ -54,13 +58,15 @@ export function getFactorKeys(): string[] {
 }
 
 /**
- * 生成模拟因子快照（用于雷达图，归一化到 0-100）
+ * 生成模拟因子快照（Z-Score 范围, 近似 N(0, 0.8²)）
  */
 export function generateMockFactorSnapshot(): Record<string, number> {
   const keys = getFactorKeys()
   const snapshot: Record<string, number> = {}
   for (const key of keys) {
-    snapshot[key] = Math.floor(Math.random() * 80 + 10)
+    const u1 = Math.random(),
+      u2 = Math.random()
+    snapshot[key] = parseFloat(((u1 + u2 - 1) * 2).toFixed(2)) // ~N(0, 0.8²)
   }
   return snapshot
 }

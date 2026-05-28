@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 ===================================
 TushareFetcher - Backup Data Source (Priority 1)
@@ -18,27 +17,25 @@ import json as _json
 import logging
 import os
 import time
-from datetime import datetime, timedelta
-from typing import Optional, List
 
 import pandas as pd
 import requests
 from tenacity import (
+    before_sleep_log,
     retry,
+    retry_if_exception_type,
     stop_after_attempt,
     wait_exponential,
-    retry_if_exception_type,
-    before_sleep_log,
 )
 
 from .base import (
+    STANDARD_COLUMNS,
     BaseFetcher,
     DataFetchError,
     RateLimitError,
-    STANDARD_COLUMNS,
+    _is_etf_code,
     is_bse_code,
     normalize_stock_code,
-    _is_etf_code,
 )
 
 logger = logging.getLogger(__name__)
@@ -47,8 +44,8 @@ logger = logging.getLogger(__name__)
 # ETF code prefixes by exchange
 # Shanghai: 51xxxx, 52xxxx, 56xxxx, 58xxxx
 # Shenzhen: 15xxxx, 16xxxx, 18xxxx
-_ETF_SH_PREFIXES = ('51', '52', '56', '58')
-_ETF_SZ_PREFIXES = ('15', '16', '18')
+_ETF_SH_PREFIXES = ("51", "52", "56", "58")
+_ETF_SZ_PREFIXES = ("15", "16", "18")
 _ETF_ALL_PREFIXES = _ETF_SH_PREFIXES + _ETF_SZ_PREFIXES
 
 
@@ -119,8 +116,8 @@ class TushareFetcher(BaseFetcher):
         """
         self.rate_limit_per_minute = rate_limit_per_minute
         self._call_count = 0  # Current minute call count
-        self._minute_start: Optional[float] = None  # Current counting period start time
-        self._api: Optional[object] = None  # Tushare API instance
+        self._minute_start: float | None = None  # Current counting period start time
+        self._api: object | None = None  # Tushare API instance
 
         # Attempt to initialize API
         self._init_api()
@@ -240,9 +237,9 @@ class TushareFetcher(BaseFetcher):
         code = normalize_stock_code(stock_code).strip()
 
         # Already has .SH/.SZ/.BJ suffix
-        if '.' in code:
+        if "." in code:
             ts_code = code.upper()
-            if ts_code.endswith('.SS'):
+            if ts_code.endswith(".SS"):
                 return f"{ts_code[:-3]}.SH"
             return ts_code
 
@@ -259,9 +256,9 @@ class TushareFetcher(BaseFetcher):
         # Regular stocks:
         # Shanghai: 600xxx, 601xxx, 603xxx, 688xxx (STAR Market)
         # Shenzhen: 000xxx, 002xxx, 300xxx (ChiNext)
-        if code.startswith(('600', '601', '603', '688')):
+        if code.startswith(("600", "601", "603", "688")):
             return f"{code}.SH"
-        elif code.startswith(('000', '002', '300')):
+        elif code.startswith(("000", "002", "300")):
             return f"{code}.SZ"
         else:
             logger.warning(f"Cannot determine market for stock {code}, defaulting to SZ")
@@ -300,8 +297,8 @@ class TushareFetcher(BaseFetcher):
         api_name = "fund_daily" if is_etf else "daily"
 
         # Convert date format (Tushare requires YYYYMMDD)
-        ts_start = start_date.replace('-', '')
-        ts_end = end_date.replace('-', '')
+        ts_start = start_date.replace("-", "")
+        ts_end = end_date.replace("-", "")
 
         logger.debug(f"Calling Tushare {api_name}({ts_code}, {ts_start}, {ts_end})")
 
@@ -325,7 +322,7 @@ class TushareFetcher(BaseFetcher):
             error_msg = str(e).lower()
 
             # Detect quota exceeded
-            if any(keyword in error_msg for keyword in ['quota', 'limit', 'permission']):
+            if any(keyword in error_msg for keyword in ["quota", "limit", "permission"]):
                 logger.warning(f"Tushare quota possibly exceeded: {e}")
                 raise RateLimitError(f"Tushare quota exceeded: {e}") from e
 
@@ -349,30 +346,106 @@ class TushareFetcher(BaseFetcher):
 
         # Column name mapping
         column_mapping = {
-            'trade_date': 'date',
-            'vol': 'volume',
+            "trade_date": "date",
+            "vol": "volume",
         }
 
         df = df.rename(columns=column_mapping)
 
         # Convert date format (YYYYMMDD -> datetime)
-        if 'date' in df.columns:
-            df['date'] = pd.to_datetime(df['date'], format='%Y%m%d')
+        if "date" in df.columns:
+            df["date"] = pd.to_datetime(df["date"], format="%Y%m%d")
 
         # Volume: lots -> shares
-        if 'volume' in df.columns:
-            df['volume'] = df['volume'] * 100
+        if "volume" in df.columns:
+            df["volume"] = df["volume"] * 100
 
         # Amount: thousands of yuan -> yuan
-        if 'amount' in df.columns:
-            df['amount'] = df['amount'] * 1000
+        if "amount" in df.columns:
+            df["amount"] = df["amount"] * 1000
 
         # Add stock code column
-        df['code'] = stock_code
+        df["code"] = stock_code
 
         # Keep only required columns
-        keep_cols = ['code'] + STANDARD_COLUMNS
+        keep_cols = ["code"] + STANDARD_COLUMNS
         existing_cols = [col for col in keep_cols if col in df.columns]
         df = df[existing_cols]
 
         return df
+
+    def _convert_index_code(self, index_code: str) -> str:
+        """
+        Convert index code to Tushare ts_code format.
+
+        Tushare index codes:
+        - 000300 (沪深300) -> 000300.SH
+        - 000001 (上证指数) -> 000001.SH
+        - 399001 (深证成指) -> 399001.SZ
+        - 399006 (创业板指) -> 399006.SZ
+
+        Args:
+            index_code: Raw index code, e.g. '000300'
+
+        Returns:
+            Tushare format code, e.g. '000300.SH', '399001.SZ'
+        """
+        code = index_code.strip()
+
+        # Already has suffix
+        if "." in code:
+            return code.upper()
+
+        # Determine exchange by prefix:
+        # 000xxx, 001xxx, 002xxx, 003xxx -> SH (上证指数)
+        # 399xxx -> SZ (深证指数)
+        if code.startswith("399"):
+            return f"{code}.SZ"
+        else:
+            return f"{code}.SH"
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=30),
+        retry=retry_if_exception_type((ConnectionError, TimeoutError)),
+        before_sleep=before_sleep_log(logger, logging.WARNING),
+    )
+    def get_index_daily_data(self, index_code: str, start_date: str, end_date: str) -> pd.DataFrame:
+        """
+        Fetch index historical data from Tushare index_daily API.
+
+        Args:
+            index_code: Index code, e.g. '000300'
+            start_date: Start date (format flexible)
+            end_date: End date (format flexible)
+
+        Returns:
+            DataFrame with index daily data
+        """
+        if self._api is None:
+            raise DataFetchError("Tushare API not initialized, check TUSHARE_TOKEN configuration")
+
+        self._check_rate_limit()
+        ts_code = self._convert_index_code(index_code)
+        ts_start = start_date.replace("-", "")
+        ts_end = end_date.replace("-", "")
+
+        logger.info(f"[API call] Tushare index_daily({ts_code}, {ts_start}, {ts_end})")
+
+        try:
+            df = self._api.index_daily(
+                ts_code=ts_code,
+                start_date=ts_start,
+                end_date=ts_end,
+            )
+            if df is not None and not df.empty:
+                logger.info(f"[API response] Tushare index_daily success: {len(df)} rows")
+                return df
+            raise DataFetchError(f"[{self.name}] No index data returned for {index_code}")
+
+        except Exception as e:
+            error_msg = str(e).lower()
+            if any(keyword in error_msg for keyword in ["quota", "limit", "permission"]):
+                raise RateLimitError(f"Tushare quota exceeded: {e}") from e
+            raise DataFetchError(f"Tushare index data fetch failed: {e}") from e
+

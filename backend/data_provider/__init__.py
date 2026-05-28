@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Data Provider package for piao-pick stock screening system.
 
@@ -11,19 +10,19 @@ Exports:
 - TushareFetcher: Backup data source (Tushare Pro API)
 """
 
+from .akshare_fetcher import AkshareFetcher
 from .base import (
+    STANDARD_COLUMNS,
     BaseFetcher,
     DataFetcherManager,
     DataFetchError,
     RateLimitError,
-    STANDARD_COLUMNS,
-    normalize_stock_code,
     canonical_stock_code,
     is_bse_code,
-    is_st_stock,
     is_kc_cy_stock,
+    is_st_stock,
+    normalize_stock_code,
 )
-from .akshare_fetcher import AkshareFetcher
 from .tushare_fetcher import TushareFetcher
 
 __all__ = [

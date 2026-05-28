@@ -28,18 +28,13 @@ const fillColor = computed(() => {
 
 <template>
   <div
-    class="inline-flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm border"
-    style="
-      background-color: var(--color-surface-inset);
-      border-color: var(--color-border);
-    "
+    class="inline-flex items-center gap-2.5 rounded-md border px-3 py-1.5 text-sm"
+    style="background-color: var(--color-surface-inset); border-color: var(--color-border)"
   >
     <span class="text-xs text-[var(--color-text-secondary)]">
       {{ label }}
     </span>
-    <div
-      class="w-16 h-1.5 rounded-full overflow-hidden bg-[var(--color-border)]"
-    >
+    <div class="h-1.5 w-16 overflow-hidden rounded-full bg-[var(--color-border)]">
       <div
         class="h-full rounded-full transition-all duration-300"
         :style="{ width: percentage + '%', backgroundColor: fillColor }"

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 过滤器函数
 
@@ -42,15 +41,11 @@ def apply_filters(
         if filter_type == "percentile_top":
             result = filter_percentile_top(result, f.get("count", 100))
         elif filter_type == "threshold":
-            result = filter_threshold(result, f.get("value", 50.0))
+            result = filter_threshold(result, f.get("value", 0.0))
         elif filter_type == "industry_diversify":
-            result = filter_industry_diversify(
-                result, stock_info_df, f.get("max_per_industry", 5)
-            )
+            result = filter_industry_diversify(result, stock_info_df, f.get("max_per_industry", 5))
         elif filter_type == "market_cap_min":
-            result = filter_market_cap_min(
-                result, stock_info_df, f.get("value", 0)
-            )
+            result = filter_market_cap_min(result, stock_info_df, f.get("value", 0))
         else:
             logger.warning(f"Unknown filter type: {filter_type}")
 
@@ -62,6 +57,7 @@ def apply_filters(
 def filter_universe(
     stock_df: pd.DataFrame,
     universe_config: dict,
+    trade_date: str | None = None,
 ) -> pd.DataFrame:
     """
     股票池过滤。
@@ -96,10 +92,9 @@ def filter_universe(
     if "exclude_new_listing_days" in universe_config:
         min_days = universe_config["exclude_new_listing_days"]
         if "list_date" in stock_df.columns:
-            cutoff = (date.today() - timedelta(days=min_days)).isoformat()
-            mask = mask & (
-                stock_df["list_date"].fillna("1900-01-01") <= cutoff
-            )
+            ref_date = date.fromisoformat(trade_date) if trade_date else date.today()
+            cutoff = (ref_date - timedelta(days=min_days)).isoformat()
+            mask = mask & (stock_df["list_date"].fillna("1900-01-01") <= cutoff)
 
     if universe_config.get("exclude_bse", False):
         codes = stock_df.index.astype(str)
@@ -145,9 +140,7 @@ def filter_threshold(
         过滤后的 DataFrame
     """
     if score_column not in scored_df.columns:
-        logger.warning(
-            f"Score column '{score_column}' not found, skipping threshold filter"
-        )
+        logger.warning(f"Score column '{score_column}' not found, skipping threshold filter")
         return scored_df
     return scored_df[scored_df[score_column] >= threshold].reset_index(drop=True)
 
@@ -180,10 +173,7 @@ def filter_industry_diversify(
             df = df.merge(info, on="ts_code", how="left")
 
     if industry_column not in df.columns:
-        logger.warning(
-            f"Industry column '{industry_column}' not available, "
-            "skipping industry diversify filter"
-        )
+        logger.warning(f"Industry column '{industry_column}' not available, skipping industry diversify filter")
         return scored_df
 
     industry_counts: dict[str, int] = {}

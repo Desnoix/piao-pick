@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import VChart from 'vue-echarts'
 import { use } from 'echarts/core'
 import { LineChart } from 'echarts/charts'
@@ -7,14 +7,29 @@ import {
   TooltipComponent,
   GridComponent,
   LegendComponent,
+  DataZoomComponent,
 } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 import { FACTOR_LABELS } from '../../utils/constants'
 import { useChartTheme } from '../../composables/use-chart-theme'
 
-use([LineChart, TooltipComponent, GridComponent, LegendComponent, CanvasRenderer])
+use([
+  LineChart,
+  TooltipComponent,
+  GridComponent,
+  LegendComponent,
+  DataZoomComponent,
+  CanvasRenderer,
+])
 
 const { theme } = useChartTheme()
+const chartRef = ref()
+
+defineExpose({
+  get chart() {
+    return chartRef.value?.chart
+  },
+})
 
 const props = defineProps<{
   dates: string[]
@@ -71,13 +86,14 @@ const option = computed(() => {
       axisLine: { lineStyle: { color: theme.value.axisLine.lineStyle.color } },
       splitLine: { lineStyle: { color: theme.value.splitLine.lineStyle.color } },
     },
+    dataZoom: [{ type: 'inside', xAxisIndex: 0, start: 70, end: 100 }],
     series,
   }
 })
 </script>
 
 <template>
-  <div class="w-full h-[350px]">
-    <VChart :option="option" autoresize />
+  <div class="h-[350px] w-full">
+    <VChart ref="chartRef" :option="option" autoresize />
   </div>
 </template>

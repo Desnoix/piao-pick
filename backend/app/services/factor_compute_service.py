@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 因子计算服务
 
@@ -8,16 +7,17 @@
 - 动量因子 (20日收益率, 60日波动率)
 - 换手率因子 (20日均换手率)
 """
-import logging
-from typing import List, Optional
-import pandas as pd
-import numpy as np
-from datetime import datetime
 
-from app.database import get_db
-from app.repositories import StockRepository, FactorRepository
-from app.models.factor import Factor
+import logging
+
+import numpy as np
+import pandas as pd
+
 from app.core.factor.momentum import compute_ret_20d, compute_ret_60d_vol, compute_turnover_20d
+from app.database import get_db
+from app.models.factor import Factor
+from app.repositories import FactorRepository, StockRepository
+from app.services.cache import get_cache_manager
 
 logger = logging.getLogger(__name__)
 
@@ -33,8 +33,8 @@ class FactorComputeService:
     def compute_factors_for_stock(
         self,
         ts_code: str,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
     ) -> int:
         """
         为单只股票计算时序因子。
@@ -48,28 +48,28 @@ class FactorComputeService:
             写入的因子记录数
         """
         # 加载K线数据
-        klines = self.stock_repo.get_klines_by_code(
-            ts_code, start_date=start_date, end_date=end_date
-        )
+        klines = self.stock_repo.get_klines_by_code(ts_code, start_date=start_date, end_date=end_date)
         if not klines:
             logger.warning(f"No kline data for {ts_code}")
             return 0
 
         # 转为 DataFrame
-        df = pd.DataFrame([
-            {
-                "ts_code": k.ts_code,
-                "trade_date": k.trade_date,
-                "open": k.open,
-                "high": k.high,
-                "low": k.low,
-                "close": k.close,
-                "close_adj": k.close_adj,
-                "volume": k.volume,
-                "turnover_rate": k.turnover_rate,
-            }
-            for k in klines
-        ])
+        df = pd.DataFrame(
+            [
+                {
+                    "ts_code": k.ts_code,
+                    "trade_date": k.trade_date,
+                    "open": k.open,
+                    "high": k.high,
+                    "low": k.low,
+                    "close": k.close,
+                    "close_adj": k.close_adj,
+                    "volume": k.volume,
+                    "turnover_rate": k.turnover_rate,
+                }
+                for k in klines
+            ]
+        )
         df = df.sort_values("trade_date").reset_index(drop=True)
 
         if len(df) < 20:
@@ -87,7 +87,7 @@ class FactorComputeService:
         df["turnover_20d"] = compute_turnover_20d(df)
 
         # 构建 Factor 对象列表
-        factors: List[Factor] = []
+        factors: list[Factor] = []
         for _, row in df.iterrows():
             factor = Factor(
                 ts_code=row["ts_code"],
@@ -102,14 +102,16 @@ class FactorComputeService:
         # 批量写入
         if factors:
             self.factor_repo.upsert_factor_batch(factors)
+            cm = get_cache_manager()
+            cm.invalidate_stock_cache(ts_code)
             logger.info(f"Computed {len(factors)} factor records for {ts_code}")
 
         return len(factors)
 
     def compute_factors_for_all_stocks(
         self,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
     ) -> dict:
         """
         为所有股票计算时序因子。
@@ -150,10 +152,7 @@ class FactorComputeService:
                 errors.append(f"{ts_code}: {e}")
                 logger.error(f"Failed to compute factors for {ts_code}: {e}")
 
-        logger.info(
-            f"Factor computation completed: "
-            f"{computed} stocks computed, {failed} failed"
-        )
+        logger.info(f"Factor computation completed: {computed} stocks computed, {failed} failed")
 
         return {
             "computed": computed,
@@ -193,7 +192,7 @@ class FactorComputeService:
 
         computed = 0
         failed = 0
-        factors_list: List[Factor] = []
+        factors_list: list[Factor] = []
 
         for kline in klines:
             try:
@@ -207,17 +206,19 @@ class FactorComputeService:
                     continue
 
                 # 转为 DataFrame
-                df = pd.DataFrame([
-                    {
-                        "ts_code": k.ts_code,
-                        "trade_date": k.trade_date,
-                        "close": k.close,
-                        "close_adj": k.close_adj,
-                        "volume": k.volume,
-                        "turnover_rate": k.turnover_rate,
-                    }
-                    for k in hist_klines
-                ])
+                df = pd.DataFrame(
+                    [
+                        {
+                            "ts_code": k.ts_code,
+                            "trade_date": k.trade_date,
+                            "close": k.close,
+                            "close_adj": k.close_adj,
+                            "volume": k.volume,
+                            "turnover_rate": k.turnover_rate,
+                        }
+                        for k in hist_klines
+                    ]
+                )
                 df = df.sort_values("trade_date").reset_index(drop=True)
 
                 # 计算时序因子
@@ -225,14 +226,22 @@ class FactorComputeService:
                 ret_60d_vol = compute_ret_60d_vol(df).iloc[-1]
                 turnover_20d = compute_turnover_20d(df).iloc[-1]
 
-                factor = Factor(
-                    ts_code=kline.ts_code,
-                    trade_date=trade_date,
-                    ret_20d=self._safe_float(ret_20d),
-                    ret_60d_vol=self._safe_float(ret_60d_vol),
-                    turnover_20d=self._safe_float(turnover_20d),
-                )
-                factors_list.append(factor)
+                # 读取已有记录，保留截面因子不被覆盖
+                existing_factor = self.factor_repo.get_factor(kline.ts_code, trade_date)
+                if existing_factor:
+                    existing_factor.ret_20d = self._safe_float(ret_20d)
+                    existing_factor.ret_60d_vol = self._safe_float(ret_60d_vol)
+                    existing_factor.turnover_20d = self._safe_float(turnover_20d)
+                    factors_list.append(existing_factor)
+                else:
+                    factor = Factor(
+                        ts_code=kline.ts_code,
+                        trade_date=trade_date,
+                        ret_20d=self._safe_float(ret_20d),
+                        ret_60d_vol=self._safe_float(ret_60d_vol),
+                        turnover_20d=self._safe_float(turnover_20d),
+                    )
+                    factors_list.append(factor)
                 computed += 1
 
             except Exception as e:
@@ -243,10 +252,7 @@ class FactorComputeService:
         if factors_list:
             self.factor_repo.upsert_factor_batch(factors_list)
 
-        logger.info(
-            f"Cross-sectional factors for {trade_date}: "
-            f"{computed} computed, {failed} failed"
-        )
+        logger.info(f"Cross-sectional factors for {trade_date}: {computed} computed, {failed} failed")
 
         return {
             "computed": computed,
@@ -255,7 +261,7 @@ class FactorComputeService:
         }
 
     @staticmethod
-    def _safe_float(val) -> Optional[float]:
+    def _safe_float(val) -> float | None:
         """安全转换为 float"""
         if val is None:
             return None

@@ -1,7 +1,6 @@
-# -*- coding: utf-8 -*-
-from .stock import StockInfoSchema, KlineSchema
-from .strategy import StrategySchema, StrategyDetailSchema
-from .selection import StockScoreSchema, SelectionResultSchema
+from .selection import SelectionResultSchema, StockScoreSchema
+from .stock import KlineSchema, StockInfoSchema
+from .strategy import StrategyDetailSchema, StrategySchema
 
 __all__ = [
     "StockInfoSchema",

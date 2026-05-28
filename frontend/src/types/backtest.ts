@@ -22,6 +22,13 @@ export interface BacktestMetrics {
   calmar_ratio: number
   monthly_win_rate: number
   avg_turnover?: number
+  // 基准对比指标
+  benchmark_total_return?: number
+  excess_return?: number
+  tracking_error?: number
+  information_ratio?: number
+  alpha?: number
+  beta?: number
 }
 
 export interface BacktestRunResponse {
@@ -31,6 +38,7 @@ export interface BacktestRunResponse {
   period: BacktestPeriod
   metrics: BacktestMetrics
   nav_series: [string, number][]
+  benchmark_nav?: [string, number][] // 归一化后的沪深 300 净值
   returns: number[]
   turnover_history: number[]
 }

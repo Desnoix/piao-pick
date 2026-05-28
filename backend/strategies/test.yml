@@ -1,0 +1,66 @@
+name: test
+display_name: 测试
+description: ''
+category: value
+version: '1.0'
+default_active: true
+default_priority: 50
+universe:
+  exclude_st: true
+  exclude_new_listing_days: 60
+  exclude_suspended: true
+  exclude_bse: true
+  min_market_cap: 200
+  min_daily_amount: 100
+factors:
+  - id: pe_ttm
+    weight: 10
+    direction: positive
+    enabled: true
+  - id: pb
+    weight: 11
+    direction: positive
+    enabled: true
+  - id: ps_ttm
+    weight: 11
+    direction: positive
+    enabled: true
+  - id: fcf_yield
+    weight: 11
+    direction: positive
+    enabled: true
+  - id: ret_20d
+    weight: 11
+    direction: positive
+    enabled: true
+  - id: ret_60d_vol
+    weight: 11
+    direction: positive
+    enabled: true
+  - id: turnover_20d
+    weight: 7
+    direction: positive
+    enabled: true
+  - id: roe_ttm
+    weight: 7
+    direction: positive
+    enabled: true
+  - id: gross_margin
+    weight: 7
+    direction: positive
+    enabled: true
+  - id: rev_growth_yoy
+    weight: 7
+    direction: positive
+    enabled: true
+  - id: ear_growth_yoy
+    weight: 7
+    direction: positive
+    enabled: true
+filters:
+  - type: percentile_top
+    value: 30
+output:
+  max_stocks: 30
+  sort_by: composite_score
+  sort_order: desc

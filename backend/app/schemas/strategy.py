@@ -1,14 +1,12 @@
-# -*- coding: utf-8 -*-
 from pydantic import BaseModel
-from typing import Optional
 
 
 class StrategySchema(BaseModel):
     id: str
-    name: Optional[str] = None
-    display_name: Optional[str] = None
-    description: Optional[str] = None
-    category: Optional[str] = None
+    name: str | None = None
+    display_name: str | None = None
+    description: str | None = None
+    category: str | None = None
     is_active: bool = True
     priority: int = 50
 

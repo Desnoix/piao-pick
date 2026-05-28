@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 ===================================
 History K-Line Data Source Test
@@ -26,15 +25,12 @@ Test parameters:
 import logging
 import time
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Any
 
 import pandas as pd
 import requests
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -45,7 +41,7 @@ class DataSourceTester:
         self.stock_code = stock_code
         self.start_date = start_date
         self.end_date = end_date
-        self.results: list[Dict[str, Any]] = []
+        self.results: list[dict[str, Any]] = []
 
     def run_all_tests(self) -> None:
         """Run all data source tests."""
@@ -69,14 +65,14 @@ class DataSourceTester:
         print("TEST SUMMARY")
         print("=" * 80)
 
-        success_count = sum(1 for r in self.results if r['status'] == 'OK')
+        success_count = sum(1 for r in self.results if r["status"] == "OK")
         total_count = len(self.results)
 
         for idx, result in enumerate(self.results, 1):
-            status = "[OK] OK" if result['status'] == 'OK' else "[FAIL] FAIL"
+            status = "[OK] OK" if result["status"] == "OK" else "[FAIL] FAIL"
             print(f"{idx}. {result['name']}: {status}")
             print(f"   Rows: {result['rows']}, Time: {result['time']:.2f}s")
-            if result.get('columns'):
+            if result.get("columns"):
                 print(f"   Columns: {result['columns']}")
             print()
 
@@ -101,9 +97,9 @@ class DataSourceTester:
             df = ak.stock_zh_a_hist(
                 symbol=self.stock_code,
                 period="daily",
-                start_date=self.start_date.replace('-', ''),
-                end_date=self.end_date.replace('-', ''),
-                adjust="qfq"
+                start_date=self.start_date.replace("-", ""),
+                end_date=self.end_date.replace("-", ""),
+                adjust="qfq",
             )
             api_elapsed = time.time() - api_start
 
@@ -113,15 +109,15 @@ class DataSourceTester:
                 sample_data = df.head(2)
 
                 result = {
-                    'name': test_name,
-                    'status': 'OK',
-                    'rows': len(df),
-                    'time': elapsed,
-                    'columns': columns,
-                    'sample': sample_data
+                    "name": test_name,
+                    "status": "OK",
+                    "rows": len(df),
+                    "time": elapsed,
+                    "columns": columns,
+                    "sample": sample_data,
                 }
 
-                print(f"   [OK] SUCCESS")
+                print("   [OK] SUCCESS")
                 print(f"   Rows: {len(df)}")
                 print(f"   Columns: {columns}")
                 print(f"   Time: {elapsed:.2f}s")
@@ -131,36 +127,24 @@ class DataSourceTester:
             else:
                 elapsed = time.time() - start_time
                 result = {
-                    'name': test_name,
-                    'status': 'FAIL',
-                    'rows': 0,
-                    'time': elapsed,
-                    'error': 'Empty data returned'
+                    "name": test_name,
+                    "status": "FAIL",
+                    "rows": 0,
+                    "time": elapsed,
+                    "error": "Empty data returned",
                 }
 
-                print(f"   [FAIL] FAILED: Empty data returned")
+                print("   [FAIL] FAILED: Empty data returned")
 
         except ImportError:
             elapsed = time.time() - start_time
-            result = {
-                'name': test_name,
-                'status': 'FAIL',
-                'rows': 0,
-                'time': elapsed,
-                'error': 'AKShare not installed'
-            }
+            result = {"name": test_name, "status": "FAIL", "rows": 0, "time": elapsed, "error": "AKShare not installed"}
 
-            print(f"   [FAIL] FAILED: AKShare not installed")
+            print("   [FAIL] FAILED: AKShare not installed")
 
         except Exception as e:
             elapsed = time.time() - start_time
-            result = {
-                'name': test_name,
-                'status': 'FAIL',
-                'rows': 0,
-                'time': elapsed,
-                'error': str(e)
-            }
+            result = {"name": test_name, "status": "FAIL", "rows": 0, "time": elapsed, "error": str(e)}
 
             print(f"   [FAIL] FAILED: {e}")
 
@@ -181,21 +165,17 @@ class DataSourceTester:
 
             api_start = time.time()
             try:
-                df = ak.stock_zh_a_daily(
-                    symbol=self.stock_code,
-                    start_date=self.start_date,
-                    end_date=self.end_date
-                )
+                df = ak.stock_zh_a_daily(symbol=self.stock_code, start_date=self.start_date, end_date=self.end_date)
             except Exception as e:
                 error_msg = str(e)
-                if 'date' in error_msg:
+                if "date" in error_msg:
                     elapsed = time.time() - start_time
                     result = {
-                        'name': test_name,
-                        'status': 'SKIP',
-                        'rows': 0,
-                        'time': elapsed,
-                        'error': f'API issue: {error_msg}. See test_akshare_daily.py for details.'
+                        "name": test_name,
+                        "status": "SKIP",
+                        "rows": 0,
+                        "time": elapsed,
+                        "error": f"API issue: {error_msg}. See test_akshare_daily.py for details.",
                     }
                     print(f"   [SKIP] SKIPPED: {error_msg}")
                     print("   Note: AKShare stock_zh_a_daily has internal errors in current environment")
@@ -211,15 +191,15 @@ class DataSourceTester:
                 sample_data = df.head(2)
 
                 result = {
-                    'name': test_name,
-                    'status': 'OK',
-                    'rows': len(df),
-                    'time': elapsed,
-                    'columns': columns,
-                    'sample': sample_data
+                    "name": test_name,
+                    "status": "OK",
+                    "rows": len(df),
+                    "time": elapsed,
+                    "columns": columns,
+                    "sample": sample_data,
                 }
 
-                print(f"   [OK] SUCCESS")
+                print("   [OK] SUCCESS")
                 print(f"   Rows: {len(df)}")
                 print(f"   Columns: {columns}")
                 print(f"   Time: {elapsed:.2f}s")
@@ -229,36 +209,24 @@ class DataSourceTester:
             else:
                 elapsed = time.time() - start_time
                 result = {
-                    'name': test_name,
-                    'status': 'FAIL',
-                    'rows': 0,
-                    'time': elapsed,
-                    'error': 'Empty data returned'
+                    "name": test_name,
+                    "status": "FAIL",
+                    "rows": 0,
+                    "time": elapsed,
+                    "error": "Empty data returned",
                 }
 
-                print(f"   [FAIL] FAILED: Empty data returned")
+                print("   [FAIL] FAILED: Empty data returned")
 
         except ImportError:
             elapsed = time.time() - start_time
-            result = {
-                'name': test_name,
-                'status': 'FAIL',
-                'rows': 0,
-                'time': elapsed,
-                'error': 'AKShare not installed'
-            }
+            result = {"name": test_name, "status": "FAIL", "rows": 0, "time": elapsed, "error": "AKShare not installed"}
 
-            print(f"   [FAIL] FAILED: AKShare not installed")
+            print("   [FAIL] FAILED: AKShare not installed")
 
         except Exception as e:
             elapsed = time.time() - start_time
-            result = {
-                'name': test_name,
-                'status': 'FAIL',
-                'rows': 0,
-                'time': elapsed,
-                'error': str(e)
-            }
+            result = {"name": test_name, "status": "FAIL", "rows": 0, "time": elapsed, "error": str(e)}
 
             print(f"   [FAIL] FAILED: {e}")
 
@@ -280,14 +248,14 @@ class DataSourceTester:
             api_start = time.time()
 
             lg = bs.login()
-            if lg.error_code != '0':
+            if lg.error_code != "0":
                 elapsed = time.time() - start_time
                 result = {
-                    'name': test_name,
-                    'status': 'FAIL',
-                    'rows': 0,
-                    'time': elapsed,
-                    'error': f'BaoStock login failed: {lg.error_msg}'
+                    "name": test_name,
+                    "status": "FAIL",
+                    "rows": 0,
+                    "time": elapsed,
+                    "error": f"BaoStock login failed: {lg.error_msg}",
                 }
                 print(f"   [FAIL] FAILED: BaoStock login failed: {lg.error_msg}")
                 self.results.append(result)
@@ -300,12 +268,7 @@ class DataSourceTester:
             end = self.end_date
 
             rs = bs.query_history_k_data_plus(
-                code,
-                fields,
-                start_date=start,
-                end_date=end,
-                frequency="d",
-                adjustflag="3"
+                code, fields, start_date=start, end_date=end, frequency="d", adjustflag="3"
             )
 
             api_elapsed = time.time() - api_start
@@ -313,27 +276,27 @@ class DataSourceTester:
             print(f"   [DEBUG] API response: error_code={rs.error_code}, error_msg={rs.error_msg}")
 
             rows = []
-            while (rs.error_code == '0') & rs.next():
+            while (rs.error_code == "0") & rs.next():
                 rows.append(rs.get_row_data())
 
             bs.logout()
 
             if rows:
                 elapsed = time.time() - start_time
-                df = pd.DataFrame(rows, columns=fields.split(','))
+                df = pd.DataFrame(rows, columns=fields.split(","))
                 columns = list(df.columns)
                 sample_data = df.head(2)
 
                 result = {
-                    'name': test_name,
-                    'status': 'OK',
-                    'rows': len(df),
-                    'time': elapsed,
-                    'columns': columns,
-                    'sample': sample_data
+                    "name": test_name,
+                    "status": "OK",
+                    "rows": len(df),
+                    "time": elapsed,
+                    "columns": columns,
+                    "sample": sample_data,
                 }
 
-                print(f"   [OK] SUCCESS")
+                print("   [OK] SUCCESS")
                 print(f"   Rows: {len(df)}")
                 print(f"   Columns: {columns}")
                 print(f"   Time: {elapsed:.2f}s")
@@ -343,36 +306,24 @@ class DataSourceTester:
             else:
                 elapsed = time.time() - start_time
                 result = {
-                    'name': test_name,
-                    'status': 'FAIL',
-                    'rows': 0,
-                    'time': elapsed,
-                    'error': f'Empty data returned. API error: {rs.error_code} - {rs.error_msg}'
+                    "name": test_name,
+                    "status": "FAIL",
+                    "rows": 0,
+                    "time": elapsed,
+                    "error": f"Empty data returned. API error: {rs.error_code} - {rs.error_msg}",
                 }
 
                 print(f"   [FAIL] FAILED: Empty data returned. API error: {rs.error_code} - {rs.error_msg}")
 
         except ImportError:
             elapsed = time.time() - start_time
-            result = {
-                'name': test_name,
-                'status': 'FAIL',
-                'rows': 0,
-                'time': elapsed,
-                'error': 'AKShare not installed'
-            }
+            result = {"name": test_name, "status": "FAIL", "rows": 0, "time": elapsed, "error": "AKShare not installed"}
 
-            print(f"   [FAIL] FAILED: AKShare not installed")
+            print("   [FAIL] FAILED: AKShare not installed")
 
         except Exception as e:
             elapsed = time.time() - start_time
-            result = {
-                'name': test_name,
-                'status': 'FAIL',
-                'rows': 0,
-                'time': elapsed,
-                'error': str(e)
-            }
+            result = {"name": test_name, "status": "FAIL", "rows": 0, "time": elapsed, "error": str(e)}
 
             print(f"   [FAIL] FAILED: {e}")
 
@@ -387,33 +338,31 @@ class DataSourceTester:
         start_time = time.time()
 
         try:
-            logger.info(f"[API call] HTTP request to push2his.eastmoney.com")
+            logger.info("[API call] HTTP request to push2his.eastmoney.com")
 
             api_start = time.time()
 
             code = self.stock_code
-            start = self.start_date
-            end = self.end_date
 
-            url = f"http://push2his.eastmoney.com/api/qt/clist/get?"
+            url = "http://push2his.eastmoney.com/api/qt/clist/get?"
             params = {
-                'pn': '1',
-                'pz': '1000',
-                'po': '1',
-                'np': '1',
-                'fltt': '2',
-                'invt': '2',
-                'fid': 'f3',
-                'fs': f'm:{code}',
-                'fields': 'f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f12,f13,f14,f15,f16,f17,f18,f20,f21,f23,f24,f25,f22,f11,f62,f128,f136,f115,f152',
-                'ut': 'bd1d9db0fa86400f410d795742383e60',
-                'bdqt': '',
-                '_': str(int(time.time() * 1000))
+                "pn": "1",
+                "pz": "1000",
+                "po": "1",
+                "np": "1",
+                "fltt": "2",
+                "invt": "2",
+                "fid": "f3",
+                "fs": f"m:{code}",
+                "fields": "f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f12,f13,f14,f15,f16,f17,f18,f20,f21,f23,f24,f25,f22,f11,f62,f128,f136,f115,f152",
+                "ut": "bd1d9db0fa86400f410d795742383e60",
+                "bdqt": "",
+                "_": str(int(time.time() * 1000)),
             }
 
             headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Referer': 'http://quote.eastmoney.com'
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Referer": "http://quote.eastmoney.com",
             }
 
             response = requests.get(url, params=params, headers=headers, timeout=30)
@@ -422,8 +371,8 @@ class DataSourceTester:
             if response.status_code == 200:
                 data = response.json()
 
-                if data.get('data') is not None:
-                    diff = data['data'].get('diff', [])
+                if data.get("data") is not None:
+                    diff = data["data"].get("diff", [])
                     if diff and len(diff) > 0:
                         rows = diff
                         columns = list(rows[0].keys())
@@ -433,15 +382,15 @@ class DataSourceTester:
                         sample_data = df.head(2)
 
                         result = {
-                            'name': test_name,
-                            'status': 'OK',
-                            'rows': len(df),
-                            'time': elapsed,
-                            'columns': columns,
-                            'sample': sample_data
+                            "name": test_name,
+                            "status": "OK",
+                            "rows": len(df),
+                            "time": elapsed,
+                            "columns": columns,
+                            "sample": sample_data,
                         }
 
-                        print(f"   [OK] SUCCESS")
+                        print("   [OK] SUCCESS")
                         print(f"   Rows: {len(df)}")
                         print(f"   Columns: {columns}")
                         print(f"   Time: {elapsed:.2f}s")
@@ -451,46 +400,40 @@ class DataSourceTester:
                     else:
                         elapsed = time.time() - start_time
                         result = {
-                            'name': test_name,
-                            'status': 'FAIL',
-                            'rows': 0,
-                            'time': elapsed,
-                            'error': 'Empty diff data (API returned valid response but no data)'
+                            "name": test_name,
+                            "status": "FAIL",
+                            "rows": 0,
+                            "time": elapsed,
+                            "error": "Empty diff data (API returned valid response but no data)",
                         }
 
-                        print(f"   [FAIL] FAILED: Empty diff data (API responded with rt=1, data=None)")
+                        print("   [FAIL] FAILED: Empty diff data (API responded with rt=1, data=None)")
                 else:
                     elapsed = time.time() - start_time
                     result = {
-                        'name': test_name,
-                        'status': 'FAIL',
-                        'rows': 0,
-                        'time': elapsed,
-                        'error': f'API returned no data: rc={data.get("rc")}, rt={data.get("rt")}'
+                        "name": test_name,
+                        "status": "FAIL",
+                        "rows": 0,
+                        "time": elapsed,
+                        "error": f"API returned no data: rc={data.get('rc')}, rt={data.get('rt')}",
                     }
 
                     print(f"   [FAIL] FAILED: API returned no data (rt={data.get('rt')}, rc={data.get('rc')})")
             else:
                 elapsed = time.time() - start_time
                 result = {
-                    'name': test_name,
-                    'status': 'FAIL',
-                    'rows': 0,
-                    'time': elapsed,
-                    'error': f'HTTP {response.status_code}: {response.text[:200]}'
+                    "name": test_name,
+                    "status": "FAIL",
+                    "rows": 0,
+                    "time": elapsed,
+                    "error": f"HTTP {response.status_code}: {response.text[:200]}",
                 }
 
                 print(f"   [FAIL] FAILED: HTTP {response.status_code}")
 
         except Exception as e:
             elapsed = time.time() - start_time
-            result = {
-                'name': test_name,
-                'status': 'FAIL',
-                'rows': 0,
-                'time': elapsed,
-                'error': str(e)
-            }
+            result = {"name": test_name, "status": "FAIL", "rows": 0, "time": elapsed, "error": str(e)}
 
             print(f"   [FAIL] FAILED: {e}")
 
@@ -501,7 +444,7 @@ class DataSourceTester:
 def main():
     """Main entry point."""
     test_stock_code = "600519"
-    end_date = datetime.now().strftime('%Y-%m-%d')
+    end_date = datetime.now().strftime("%Y-%m-%d")
     start_date = "2024-10-01"
 
     tester = DataSourceTester(test_stock_code, start_date, end_date)

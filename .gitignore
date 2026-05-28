@@ -46,3 +46,14 @@ frontend/dist/
 # Misc
 .DS_Store
 Thumbs.db
+
+# Testing
+htmlcov/
+.coverage
+.pytest_cache/
+__tests__
+/frontend/coverage/
+/.sisyphus/
+/backend/coverage.xml
+/backend/app/services/cache/**
+/backend/cache/**

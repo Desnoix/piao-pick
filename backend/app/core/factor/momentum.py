@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 动量因子 (可从 kline_daily 行情数据计算)
 

@@ -15,13 +15,13 @@ defineProps<{
 </script>
 
 <template>
-  <div class="flex items-center gap-6 flex-wrap">
+  <div class="flex flex-wrap items-center gap-6">
     <!-- Name + code -->
     <div class="flex items-baseline gap-3">
-      <h1 class="text-2xl font-bold leading-tight text-[var(--color-text-primary)]">
+      <h1 class="text-2xl leading-tight font-bold text-[var(--color-text-primary)]">
         {{ name }}
       </h1>
-      <span class="text-sm data-mono text-[var(--color-text-muted)]">
+      <span class="data-mono text-sm text-[var(--color-text-muted)]">
         {{ ts_code }}
       </span>
     </div>
@@ -29,7 +29,7 @@ defineProps<{
     <!-- Industry badge -->
     <span
       v-if="industry"
-      class="inline-flex items-center px-3 py-1 rounded-md text-xs font-medium border"
+      class="inline-flex items-center rounded-md border px-3 py-1 text-xs font-medium"
       style="
         background-color: var(--color-surface-inset);
         color: var(--color-text-secondary);
@@ -40,17 +40,11 @@ defineProps<{
     </span>
 
     <!-- Price + pct change (right-aligned) -->
-    <div
-      v-if="close !== null && close !== undefined"
-      class="ml-auto flex items-baseline gap-4"
-    >
-      <div class="text-2xl font-bold data-mono text-[var(--color-text-primary)]">
+    <div v-if="close !== null && close !== undefined" class="ml-auto flex items-baseline gap-4">
+      <div class="data-mono text-2xl font-bold text-[var(--color-text-primary)]">
         {{ formatPrice(close) }}
       </div>
-      <div
-        class="text-lg data-mono font-semibold"
-        :class="getPctColor(pct_change)"
-      >
+      <div class="data-mono text-lg font-semibold" :class="getPctColor(pct_change)">
         {{ formatPct(pct_change) }}
       </div>
     </div>

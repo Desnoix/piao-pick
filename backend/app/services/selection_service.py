@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 选股服务
 
@@ -7,7 +6,6 @@
 """
 
 import logging
-from typing import Optional
 
 from app.core.pipeline import SelectionPipeline
 from app.core.trading_calendar import get_effective_trading_date
@@ -24,7 +22,7 @@ class SelectionService:
     def run_selection(
         self,
         strategy_name: str,
-        trade_date: Optional[str] = None,
+        trade_date: str | None = None,
     ) -> dict:
         """
         运行选股。

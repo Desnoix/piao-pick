@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 数据库初始化脚本
 
@@ -9,8 +8,8 @@
     python scripts/init_db.py
 """
 
-import sys
 import logging
+import sys
 from pathlib import Path
 
 # 确保项目根目录在 sys.path 中
@@ -43,6 +42,7 @@ def main():
     # 运行 schema migrations (幂等 - 安全重复执行)
     try:
         from sqlalchemy import inspect, text
+
         with db.get_session() as session:
             inspector = inspect(session.bind)
             table = "kline_daily"
@@ -50,9 +50,7 @@ def main():
 
             if "turnover_rate" not in columns:
                 logger.info("Applying migration: add turnover_rate column...")
-                session.execute(text(
-                    "ALTER TABLE kline_daily ADD COLUMN turnover_rate REAL"
-                ))
+                session.execute(text("ALTER TABLE kline_daily ADD COLUMN turnover_rate REAL"))
                 session.commit()
                 logger.info("✓ Added turnover_rate column")
             else:
@@ -62,11 +60,12 @@ def main():
 
     # 加载策略到数据库（可选）
     try:
-        from app.core.strategy.loader import StrategyLoader
-        from app.repositories import StrategyRepository
-        from app.models import Strategy
         import uuid
         from datetime import datetime
+
+        from app.core.strategy.loader import StrategyLoader
+        from app.models import Strategy
+        from app.repositories import StrategyRepository
 
         loader = StrategyLoader(config.strategies_dir)
         configs = loader.load_all()
@@ -102,6 +101,14 @@ def main():
             logger.info("No strategy YAML files found to load")
     except Exception as e:
         logger.warning(f"Strategy loading failed (non-fatal): {e}")
+
+    # 同步沪深 300 指数数据 (用于回测基准对比)
+    try:
+        from scripts.sync_index_data import _sync_index
+
+        _sync_index(db, "000300", "2018-01-01")
+    except Exception as e:
+        logger.warning(f"Index data sync failed (non-fatal): {e}")
 
     logger.info("Database initialization complete!")
 

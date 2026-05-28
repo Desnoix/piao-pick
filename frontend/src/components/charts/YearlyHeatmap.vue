@@ -3,11 +3,7 @@ import { computed } from 'vue'
 import VChart from 'vue-echarts'
 import { use } from 'echarts/core'
 import { HeatmapChart } from 'echarts/charts'
-import {
-  TooltipComponent,
-  GridComponent,
-  VisualMapComponent,
-} from 'echarts/components'
+import { TooltipComponent, GridComponent, VisualMapComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 import { useChartTheme } from '../../composables/use-chart-theme'
 
@@ -22,7 +18,7 @@ const props = defineProps<{
 
 const option = computed(() => {
   const neutralBg = isDark.value ? '#1E293B' : '#F1F5F9'
-  
+
   return {
     animation: true,
     animationDuration: 600,
@@ -97,7 +93,7 @@ const option = computed(() => {
 </script>
 
 <template>
-  <div class="w-full h-[400px]">
+  <div class="h-[400px] w-full">
     <VChart :option="option" autoresize />
   </div>
 </template>

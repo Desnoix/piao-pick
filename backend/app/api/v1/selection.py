@@ -1,17 +1,17 @@
-# -*- coding: utf-8 -*-
 """
 选股 API 端点
 
-- POST /run           运行选股
-- GET  /results       获取选股结果列表
-- GET  /results/{date} 获取某日选股结果
+- POST /run                    运行选股
+- GET  /prepare/status/{date}  查询数据准备状态
+- GET  /results                获取选股结果列表
+- GET  /results/{date}         获取某日选股结果
 """
 
+import asyncio
 import logging
-from typing import Optional
-from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from app.database import get_db
@@ -35,9 +35,9 @@ def _get_strategy_repo() -> StrategyRepository:
 
 
 class SelectionRunRequest(BaseModel):
-    strategy_name: Optional[str] = None
-    strategy_id: Optional[str] = None  # deprecated, kept for backward compat
-    trade_date: Optional[str] = None
+    strategy_name: str | None = None
+    strategy_id: str | None = None  # deprecated, kept for backward compat
+    trade_date: str | None = None
 
 
 # -- Endpoints --
@@ -51,8 +51,8 @@ async def run_selection(req: SelectionRunRequest):
     如果数据库中没有因子数据，自动触发全市场数据同步。
     通过 SelectionService 调用 SelectionPipeline 执行选股。
     """
-    from app.services.selection_service import SelectionService
     from app.repositories import FactorRepository
+    from app.services.selection_service import SelectionService
 
     strategy_name = req.strategy_name
     strategy_id = req.strategy_id
@@ -75,32 +75,69 @@ async def run_selection(req: SelectionRunRequest):
             detail="strategy_name is required",
         )
 
-    logger.info(
-        f"Selection requested: strategy={strategy_name}, date={req.trade_date}"
-    )
+    logger.info(f"Selection requested: strategy={strategy_name}, date={req.trade_date}")
 
     # Auto-prepare data if factor table is empty
     trade_date = req.trade_date
     if trade_date is None:
         from app.core.trading_calendar import get_effective_trading_date
+
         trade_date = get_effective_trading_date().isoformat()
 
     db = get_db()
     factor_repo = FactorRepository(db)
     existing_factors = factor_repo.get_factors_by_date(trade_date)
     if not existing_factors:
-        logger.info(f"因子表为空 (日期 {trade_date})，自动触发全市场数据准备...")
-        from app.services.data_preparation import DataPreparationService
-        prep_service = DataPreparationService(db)
-        try:
-            prep_result = prep_service.prepare(trade_date=trade_date)
-            logger.info(f"数据准备完成: {prep_result}")
-        except Exception as e:
-            logger.error(f"数据准备失败: {e}", exc_info=True)
-            raise HTTPException(
-                status_code=500,
-                detail=f"数据准备失败: {str(e)}",
+        from app.services._prepare_state import (
+            cleanup_old,
+            is_preparing,
+            set_done,
+            set_failed,
+            set_preparing,
+        )
+
+        # 如果已有同日期任务在跑, 返回 202 让前端轮询
+        if is_preparing(trade_date):
+            return JSONResponse(
+                status_code=202,
+                content={
+                    "status": "preparing",
+                    "trade_date": trade_date,
+                    "message": "数据准备进行中, 请稍后重试",
+                },
             )
+
+        logger.info(f"因子表为空 (日期 {trade_date}), 异步触发全市场数据准备...")
+        set_preparing(trade_date)
+        cleanup_old()
+
+        async def _run_prepare():
+            from app.services.data_preparation import DataPreparationService
+
+            try:
+                prep_db = get_db()
+                prep_service = DataPreparationService(prep_db)
+                prep_result = await asyncio.to_thread(prep_service.prepare, trade_date=trade_date)
+                if prep_result.get("error"):
+                    set_failed(trade_date, prep_result["error"])
+                    logger.error(f"数据准备失败: {prep_result['error']}")
+                else:
+                    set_done(trade_date, prep_result)
+                    logger.info(f"数据准备完成: {prep_result}")
+            except Exception as e:
+                set_failed(trade_date, str(e))
+                logger.error(f"数据准备异常: {e}", exc_info=True)
+
+        asyncio.create_task(_run_prepare())
+
+        return JSONResponse(
+            status_code=202,
+            content={
+                "status": "preparing",
+                "trade_date": trade_date,
+                "message": "数据准备已启动, 预计 10-60 秒完成, 请轮询状态",
+            },
+        )
 
     try:
         service = SelectionService()
@@ -119,19 +156,60 @@ async def run_selection(req: SelectionRunRequest):
         )
 
 
+@router.get("/prepare/status/{trade_date}", summary="查询数据准备状态")
+async def get_prepare_status(trade_date: str):
+    """
+    查询某日期数据准备任务的当前状态。
+
+    返回值:
+        status: "preparing" | "done" | "failed" | "unknown"
+    """
+    from app.services._prepare_state import get_status
+
+    task = get_status(trade_date)
+    if task is None:
+        # 检查数据库中是否已有该日因子数据
+        factor_repo = FactorRepository(get_db())
+        existing = factor_repo.get_factors_by_date(trade_date)
+        if existing:
+            return {
+                "status": "done",
+                "trade_date": trade_date,
+                "factor_count": len(existing),
+            }
+        return {
+            "status": "unknown",
+            "trade_date": trade_date,
+        }
+
+    result = {
+        "status": task["status"],
+        "trade_date": trade_date,
+    }
+
+    if task.get("result"):
+        result["result"] = task["result"]
+    if task.get("error"):
+        result["error"] = task["error"]
+
+    return result
+
+
 @router.get("/results", summary="获取选股结果列表")
 async def list_selection_results(
-    strategy_id: Optional[str] = Query(None, description="策略ID"),
-    trade_date: Optional[str] = Query(None, description="交易日期 YYYY-MM-DD"),
+    strategy_id: str | None = Query(None, description="策略ID"),
+    trade_date: str | None = Query(None, description="交易日期 YYYY-MM-DD"),
     limit: int = Query(100, ge=1, le=1000, description="最大返回条数"),
 ):
     """获取选股结果"""
     repo = _get_selection_repo()
 
     if trade_date:
-        results = repo.get_by_strategy_date(
-            strategy_id=strategy_id or "", trade_date=trade_date
-        ) if strategy_id else _get_all_results_by_date(repo, trade_date)
+        results = (
+            repo.get_by_strategy_date(strategy_id=strategy_id or "", trade_date=trade_date)
+            if strategy_id
+            else _get_all_results_by_date(repo, trade_date)
+        )
     elif strategy_id:
         latest_date = repo.get_latest_date(strategy_id)
         if not latest_date:
@@ -146,7 +224,7 @@ async def list_selection_results(
 @router.get("/results/{trade_date}", summary="获取某日选股结果")
 async def get_selection_results_by_date(
     trade_date: str,
-    strategy_id: Optional[str] = Query(None, description="策略ID"),
+    strategy_id: str | None = Query(None, description="策略ID"),
 ):
     """获取某个交易日的选股结果"""
     repo = _get_selection_repo()

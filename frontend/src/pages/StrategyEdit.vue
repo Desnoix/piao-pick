@@ -19,12 +19,16 @@ import {
   NDivider,
   NBadge,
   NTooltip,
+  NDrawer,
+  NDrawerContent,
   useMessage,
   useDialog,
 } from 'naive-ui'
 import { useRouter } from 'vue-router'
 import yaml from 'js-yaml'
 import { getStrategy, updateStrategy, createStrategy } from '../api/strategies'
+import { getFactorCoverage, type FactorCoverageData } from '../api/factorCoverage'
+import FactorCoverageCard from '../components/strategy/FactorCoverageCard.vue'
 import type {
   StrategyDetail,
   StrategyConfig,
@@ -33,6 +37,7 @@ import type {
   FilterRule,
 } from '../types/strategy'
 import { FACTOR_LABELS, FACTOR_CATEGORIES } from '../utils/constants'
+import { validateYaml, type ValidationResult } from '../utils/yamlValidator'
 
 const props = defineProps<{
   id: string
@@ -46,8 +51,20 @@ const loading = ref(false)
 const saving = ref(false)
 const strategy = ref<StrategyDetail | null>(null)
 const isNew = ref(false)
-const parseError = ref('')
 const rawMode = ref(false)
+const yamlValidation = ref<ValidationResult>({ valid: true, errors: [] })
+const showValidationDrawer = ref(false)
+let validateTimer: ReturnType<typeof setTimeout> | null = null
+
+function scheduleValidation() {
+  if (validateTimer) clearTimeout(validateTimer)
+  validateTimer = setTimeout(() => {
+    yamlValidation.value = validateYaml(rawConfig.value)
+  }, 300)
+}
+
+// Factor coverage data (loaded per-strategy)
+const factorCoverage = ref<FactorCoverageData | null>(null)
 
 const name = ref('')
 const displayName = ref('')
@@ -213,10 +230,10 @@ function parseYamlConfig(yamlStr: string) {
       output.value.sort_order = (o.sort_order as 'asc' | 'desc') || 'desc'
     }
 
-    parseError.value = ''
+    yamlValidation.value = { valid: true, errors: [] }
   } catch (e: unknown) {
     const err = e as Error
-    parseError.value = `YAML 解析失败: ${err.message}`
+    message.error(`YAML 解析失败: ${err.message}`)
     rawMode.value = true
   }
 }
@@ -327,6 +344,14 @@ function updateDirection(factorId: string, direction: 'positive' | 'negative') {
   }
 }
 
+async function loadCoverage(strategyName: string) {
+  try {
+    factorCoverage.value = await getFactorCoverage(strategyName)
+  } catch {
+    factorCoverage.value = null
+  }
+}
+
 async function load() {
   if (props.id === 'new') {
     isNew.value = true
@@ -336,7 +361,7 @@ async function load() {
   }
   loading.value = true
   try {
-    strategy.value = await getStrategy(props.id)
+    strategy.value = await getStrategy(props.id, { silent: true })
     name.value = strategy.value.name || ''
     displayName.value = strategy.value.display_name || ''
     description.value = strategy.value.description || ''
@@ -346,10 +371,15 @@ async function load() {
     if (!rawMode.value) {
       parseYamlConfig(strategy.value.config || '')
     }
-  } catch (e: any) {
-    const detail = e?.response?.data?.detail || '加载失败'
-    message.error(detail)
-    if (e?.response?.status === 404) {
+
+    // Load factor coverage
+    if (strategy.value.name) {
+      await loadCoverage(strategy.value.name)
+    }
+  } catch (e: unknown) {
+    const err = e as { response?: { status?: number; data?: { detail?: string } } }
+    message.error(err?.response?.data?.detail || '加载失败')
+    if (err?.response?.status === 404) {
       router.push('/strategy/list')
     }
   } finally {
@@ -379,6 +409,16 @@ async function save() {
     return
   }
 
+  if (rawMode.value) {
+    const result = validateYaml(rawConfig.value)
+    yamlValidation.value = result
+    if (!result.valid) {
+      showValidationDrawer.value = true
+      message.error('YAML 校验未通过, 请查看错误列表')
+      return
+    }
+  }
+
   saving.value = true
   try {
     const configStr = rawMode.value ? rawConfig.value : serializeConfig()
@@ -403,8 +443,10 @@ async function save() {
     }
     router.push('/strategy/list')
   } catch (e: unknown) {
-    const err = e as { response?: { data?: { detail?: string } } }
-    message.error(err?.response?.data?.detail || '保存失败')
+    // 忽略请求取消错误（来自 client.ts 的请求去重机制）
+    if ((e as any)?.code === 'ERR_CANCELED' || (e as any)?.name === 'CanceledError') return
+    const err = e as { response?: { data?: { detail?: string } }; message?: string }
+    message.error(err?.response?.data?.detail || err?.message || '保存失败')
   } finally {
     saving.value = false
   }
@@ -413,10 +455,19 @@ async function save() {
 function toggleRawMode() {
   if (!rawMode.value) {
     rawConfig.value = serializeConfig()
+    rawMode.value = true
+    scheduleValidation()
   } else {
+    const result = validateYaml(rawConfig.value)
+    yamlValidation.value = result
+    if (!result.valid) {
+      showValidationDrawer.value = true
+      message.error('YAML 存在错误, 请修正后再切换')
+      return
+    }
     parseYamlConfig(rawConfig.value)
+    rawMode.value = false
   }
-  rawMode.value = !rawMode.value
 }
 
 onMounted(load)
@@ -430,12 +481,15 @@ watch(
   },
   { deep: true }
 )
+
+watch(rawConfig, () => {
+  if (rawMode.value) scheduleValidation()
+})
 </script>
 
 <template>
   <NSpin :show="loading">
-    <div class="strategy-edit flex flex-col gap-6 max-w-[1200px]">
-
+    <div class="strategy-edit flex max-w-[1200px] flex-col gap-6">
       <!-- Action bar -->
       <div class="action-bar">
         <div class="action-bar__left">
@@ -443,7 +497,11 @@ watch(
           <NButton v-if="!isNew" size="small" ghost @click="handleReset">重置</NButton>
         </div>
         <div class="action-bar__right">
-          <button class="mode-toggle" :class="{ 'mode-toggle--raw': rawMode }" @click="toggleRawMode">
+          <button
+            class="mode-toggle"
+            :class="{ 'mode-toggle--raw': rawMode }"
+            @click="toggleRawMode"
+          >
             <span class="mode-toggle__dot" />
             <span class="mode-toggle__label">{{ rawMode ? '可视化编辑' : 'YAML 模式' }}</span>
           </button>
@@ -451,26 +509,43 @@ watch(
         </div>
       </div>
 
-      <NAlert v-if="parseError" type="error">
-        {{ parseError }}
-      </NAlert>
-
       <!-- Raw YAML Mode -->
       <template v-if="rawMode">
-        <div class="glass-panel p-6 flex flex-col gap-4">
+        <div class="glass-panel flex flex-col gap-4 p-6">
           <NForm v-if="isNew" label-placement="left" label-width="100">
             <NFormItem label="标识">
               <NInput v-model:value="name" placeholder="策略唯一标识 (英文)" />
             </NFormItem>
           </NForm>
           <div>
-            <span class="section-label">YAML 配置</span>
+            <div class="mb-2 flex items-center justify-between">
+              <span class="section-label">YAML 配置</span>
+              <NTag
+                v-if="yamlValidation.errors.length > 0"
+                size="small"
+                :type="yamlValidation.valid ? 'warning' : 'error'"
+                :bordered="false"
+                class="cursor-pointer"
+                @click="showValidationDrawer = true"
+              >
+                {{
+                  yamlValidation.valid
+                    ? `${yamlValidation.errors.length} 个警告`
+                    : `${yamlValidation.errors.filter((e) => e.severity === 'error').length} 个错误`
+                }}
+              </NTag>
+              <NTag v-else size="small" type="success" :bordered="false">校验通过</NTag>
+            </div>
             <NInput
               v-model:value="rawConfig"
               type="textarea"
               :rows="30"
               placeholder="策略 YAML 配置"
-              class="font-mono yaml-editor"
+              class="yaml-editor font-mono"
+              :class="{
+                'yaml-editor--error': !yamlValidation.valid,
+                'yaml-editor--warn': yamlValidation.valid && yamlValidation.errors.length > 0,
+              }"
             />
           </div>
         </div>
@@ -478,11 +553,10 @@ watch(
 
       <!-- Visual Editor Mode -->
       <template v-else>
-
         <!-- Basic info -->
         <section class="flex flex-col gap-2">
           <span class="section-label">基本信息</span>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
             <NForm label-placement="left" label-width="80" class="glass-panel p-5">
               <NFormItem v-if="isNew" label="标识">
                 <NInput v-model:value="name" placeholder="策略唯一标识 (英文)" />
@@ -521,7 +595,7 @@ watch(
                 <span class="collapse-header__title">选股池</span>
               </div>
             </template>
-            <div class="glass-panel p-5 grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div class="glass-panel grid grid-cols-1 gap-5 p-5 md:grid-cols-2">
               <div class="flex flex-col gap-3">
                 <div class="universe-row">
                   <span class="universe-row__label">排除 ST 股票</span>
@@ -579,7 +653,10 @@ watch(
               <div class="collapse-header">
                 <span class="collapse-header__label">因子配置</span>
                 <span class="collapse-header__title">因子权重</span>
-                <span class="weight-status" :class="weightNormalized ? 'weight-status--ok' : 'weight-status--warn'">
+                <span
+                  class="weight-status"
+                  :class="weightNormalized ? 'weight-status--ok' : 'weight-status--warn'"
+                >
                   {{ enabledFactorCount }} 项 / {{ totalWeight }}%
                 </span>
                 <NButton
@@ -594,14 +671,20 @@ watch(
               </div>
             </template>
             <div class="glass-panel factor-panel">
-              <div v-if="factors.length === 0" class="text-center py-10 text-sm text-[var(--color-text-muted)]">
+              <div
+                v-if="factors.length === 0"
+                class="py-10 text-center text-sm text-[var(--color-text-muted)]"
+              >
                 暂无可用因子
               </div>
               <div
                 v-for="(factor, idx) in factors"
                 :key="factor.id"
                 class="factor-row"
-                :class="{ 'factor-row--disabled': !factor.enabled, 'factor-row--last': idx === factors.length - 1 }"
+                :class="{
+                  'factor-row--disabled': !factor.enabled,
+                  'factor-row--last': idx === factors.length - 1,
+                }"
               >
                 <NSwitch
                   :value="factor.enabled"
@@ -637,7 +720,7 @@ watch(
                   :max="100"
                   :step="5"
                   :disabled="!factor.enabled"
-                  class="flex-1 min-w-[100px]"
+                  class="min-w-[100px] flex-1"
                   @update:value="(val: number) => updateWeight(factor.id, val)"
                 />
                 <NInputNumber
@@ -654,6 +737,12 @@ watch(
             </div>
           </NCollapseItem>
         </NCollapse>
+
+        <!-- Factor coverage alert -->
+        <FactorCoverageCard
+          v-if="factorCoverage && factorCoverage.stub_factors.length > 0"
+          :data="factorCoverage"
+        />
 
         <!-- Filter rules -->
         <NCollapse :default-expanded-names="['filters']" arrow-placement="left">
@@ -710,14 +799,7 @@ watch(
                   />
                   <span class="filter-row__unit">亿元</span>
                 </template>
-                <NButton
-                  size="small"
-                  type="error"
-                  ghost
-                  @click="removeFilter(index)"
-                >
-                  删除
-                </NButton>
+                <NButton size="small" type="error" ghost @click="removeFilter(index)">删除</NButton>
               </div>
               <NButton size="small" dashed @click="addFilter">添加过滤规则</NButton>
             </div>
@@ -733,7 +815,7 @@ watch(
                 <span class="collapse-header__title">输出设置</span>
               </div>
             </template>
-            <div class="glass-panel p-5 grid grid-cols-1 md:grid-cols-3 gap-5">
+            <div class="glass-panel grid grid-cols-1 gap-5 p-5 md:grid-cols-3">
               <div>
                 <span class="field-label">最大股票数</span>
                 <NInputNumber
@@ -746,11 +828,7 @@ watch(
               </div>
               <div>
                 <span class="field-label">排序依据</span>
-                <NSelect
-                  v-model:value="output.sort_by"
-                  :options="sortOptions"
-                  size="small"
-                />
+                <NSelect v-model:value="output.sort_by" :options="sortOptions" size="small" />
               </div>
               <div>
                 <span class="field-label">排序方向</span>
@@ -788,6 +866,39 @@ watch(
         </section>
       </template>
     </div>
+
+    <!-- YAML Validation Drawer -->
+    <NDrawer v-model:show="showValidationDrawer" :width="420" placement="right">
+      <NDrawerContent title="YAML 校验结果" :native-scrollbar="false">
+        <div class="flex flex-col gap-3">
+          <div
+            v-for="(e, idx) in yamlValidation.errors"
+            :key="idx"
+            class="validation-item"
+            :class="`validation-item--${e.severity}`"
+          >
+            <div class="validation-item__header">
+              <NTag
+                size="tiny"
+                :type="e.severity === 'error' ? 'error' : 'warning'"
+                :bordered="false"
+              >
+                {{ e.severity === 'error' ? '错误' : '警告' }}
+              </NTag>
+              <span v-if="e.line" class="validation-item__loc">
+                第 {{ e.line }} 行
+                <template v-if="e.column">, 第 {{ e.column }} 列</template>
+              </span>
+              <span v-if="e.field" class="validation-item__loc">{{ e.field }}</span>
+            </div>
+            <div class="validation-item__msg">{{ e.message }}</div>
+          </div>
+          <div v-if="yamlValidation.errors.length === 0" class="py-8 text-center">
+            <NTag type="success" size="large" :bordered="false">全部校验通过</NTag>
+          </div>
+        </div>
+      </NDrawerContent>
+    </NDrawer>
   </NSpin>
 </template>
 
@@ -842,7 +953,10 @@ watch(
   font-size: 13px;
   font-family: inherit;
   color: var(--color-text-secondary);
-  transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease,
+    background-color 0.15s ease;
 }
 
 .mode-toggle:hover {
@@ -941,7 +1055,9 @@ watch(
   gap: 12px;
   padding: 10px 16px;
   border-bottom: 1px solid var(--color-border);
-  transition: background-color 0.12s ease, opacity 0.2s ease;
+  transition:
+    background-color 0.12s ease,
+    opacity 0.2s ease;
 }
 
 .factor-row:hover {
@@ -1023,5 +1139,51 @@ watch(
   font-family: var(--font-mono);
   font-size: 13px;
   line-height: 1.6;
+}
+
+.yaml-editor--error :deep(textarea) {
+  border-color: var(--color-error);
+  box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.2);
+}
+
+.yaml-editor--warn :deep(textarea) {
+  border-color: var(--color-warning);
+  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.2);
+}
+
+/* === Validation drawer items === */
+.validation-item {
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+}
+
+.validation-item--error {
+  border-color: rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.04);
+}
+
+.validation-item--warning {
+  border-color: rgba(245, 158, 11, 0.3);
+  background: rgba(245, 158, 11, 0.04);
+}
+
+.validation-item__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.validation-item__loc {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--color-text-muted);
+}
+
+.validation-item__msg {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
 }
 </style>

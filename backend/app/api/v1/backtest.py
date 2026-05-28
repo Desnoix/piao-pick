@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 回测 API 端点
 
@@ -8,7 +7,6 @@
 """
 
 import logging
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
@@ -26,8 +24,9 @@ class BacktestRunRequest(BaseModel):
     start_date: str
     end_date: str
     initial_capital: float = 1000000.0
-    commission_rate: float = 0.0003
-    slippage: float = 0.001
+    commission_rate: float = 0.0003  # 单边佣金 (万三)
+    stamp_tax: float = 0.0005  # 卖出印花税 (万五, 2023-08-28 减半后)
+    slippage: float = 0.001  # 单边滑点 (千一)
 
 
 class BacktestRunResponse(BaseModel):
@@ -37,13 +36,14 @@ class BacktestRunResponse(BaseModel):
     period: dict
     metrics: dict
     nav_series: list
+    benchmark_nav: list | None = None  # [(date, nav)] 归一化后的基准净值
     returns: list
     turnover_history: list
 
 
 class AvailableDatesResponse(BaseModel):
-    start_date: Optional[str] = None
-    end_date: Optional[str] = None
+    start_date: str | None = None
+    end_date: str | None = None
     trade_date_count: int = 0
 
 
@@ -69,6 +69,9 @@ async def run_backtest(req: BacktestRunRequest):
             strategy_name=req.strategy_id,
             start_date=req.start_date,
             end_date=req.end_date,
+            commission_rate=req.commission_rate,
+            stamp_tax=req.stamp_tax,
+            slippage=req.slippage,
         )
         return result
     except ValueError as e:
@@ -95,6 +98,19 @@ async def get_available_dates():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/results", summary="获取回测结果列表")
+async def list_backtest_results(
+    strategy_id: str | None = Query(None, description="策略 ID"),
+):
+    """获取历史回测结果列表"""
+    from app.database import get_db
+    from app.repositories import BacktestRepository
+
+    repo = BacktestRepository(get_db())
+    results = repo.list_backtests(strategy_id=strategy_id)
+    return results
+
+
 @router.get("/{strategy_name}", summary="获取策略最近回测结果")
 async def get_last_backtest(strategy_name: str):
     """
@@ -102,8 +118,8 @@ async def get_last_backtest(strategy_name: str):
 
     当前返回空结果，未来可从 BacktestRepository 查询持久化的回测记录。
     """
-    from app.repositories import BacktestRepository
     from app.database import get_db
+    from app.repositories import BacktestRepository
 
     repo = BacktestRepository(get_db())
     results = repo.list_backtests(strategy_id=strategy_name)
@@ -117,14 +133,158 @@ async def get_last_backtest(strategy_name: str):
     return results[-1]
 
 
-@router.get("/results", summary="获取回测结果列表")
-async def list_backtest_results(
-    strategy_id: Optional[str] = Query(None, description="策略 ID"),
-):
-    """获取历史回测结果列表"""
-    from app.repositories import BacktestRepository
-    from app.database import get_db
+# -- Overfitting Detection Endpoints --
 
-    repo = BacktestRepository(get_db())
-    results = repo.list_backtests(strategy_id=strategy_id)
-    return results
+
+class OverfitCheckRequest(BaseModel):
+    strategy_name: str
+    overall_start: str
+    overall_end: str
+    n_trials: int = 1
+    n_sub_periods: int = 8
+
+
+class WalkForwardRequest(BaseModel):
+    strategy_name: str
+    overall_start: str
+    overall_end: str
+    train_window_months: int = 36
+    test_window_months: int = 12
+    step_months: int = 12
+
+
+class PurgedKFoldRequest(BaseModel):
+    strategy_name: str
+    overall_start: str
+    overall_end: str
+    n_splits: int = 5
+    embargo_months: int = 1
+
+
+class PBORequest(BaseModel):
+    strategy_name: str
+    overall_start: str
+    overall_end: str
+    n_sub_periods: int = 8
+
+
+class DSRRequest(BaseModel):
+    observed_sharpe: float
+    n_trials: int
+    n_observation_years: float
+    skewness: float = 0.0
+    kurtosis: float = 3.0
+
+
+@router.post("/walk-forward", summary="执行 Walk-Forward 验证")
+async def run_walk_forward(req: WalkForwardRequest):
+    """执行 Walk-Forward 滚动窗口验证，输出 IS/OOS Sharpe 对比"""
+    from app.services.overfit_service import OverfitService
+
+    try:
+        svc = OverfitService()
+        result = svc.run_walk_forward(
+            req.strategy_name,
+            req.overall_start,
+            req.overall_end,
+            req.train_window_months,
+            req.test_window_months,
+            req.step_months,
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.exception(f"Walk-forward failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Walk-forward error: {e}")
+
+
+@router.post("/purged-kfold", summary="执行 Purged K-Fold 交叉验证")
+async def run_purged_kfold(req: PurgedKFoldRequest):
+    """执行 Purged K-Fold 交叉验证（含 embargo 期隔离）"""
+    from app.services.overfit_service import OverfitService
+
+    try:
+        svc = OverfitService()
+        result = svc.run_purged_kfold(
+            req.strategy_name,
+            req.overall_start,
+            req.overall_end,
+            req.n_splits,
+            req.embargo_months,
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.exception(f"Purged K-Fold failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Purged K-Fold error: {e}")
+
+
+@router.post("/pbo", summary="计算 PBO 过拟合概率")
+async def run_pbo(req: PBORequest):
+    """计算 PBO (Probability of Backtest Overfitting)"""
+    from app.services.overfit_service import OverfitService
+
+    try:
+        svc = OverfitService()
+        result = svc.run_pbo(
+            req.strategy_name,
+            req.overall_start,
+            req.overall_end,
+            req.n_sub_periods,
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.exception(f"PBO computation failed: {e}")
+        raise HTTPException(status_code=500, detail=f"PBO error: {e}")
+
+
+@router.post("/dsr", summary="计算 DSR 校正夏普比率")
+async def run_dsr(req: DSRRequest):
+    """计算 DSR (Deflated Sharpe Ratio)，校正多重检验偏差"""
+    from app.services.overfit_service import OverfitService
+
+    try:
+        svc = OverfitService()
+        result = svc.run_dsr(
+            req.observed_sharpe,
+            req.n_trials,
+            req.n_observation_years,
+            req.skewness,
+            req.kurtosis,
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.exception(f"DSR computation failed: {e}")
+        raise HTTPException(status_code=500, detail=f"DSR error: {e}")
+
+
+@router.post("/overfit-check", summary="运行完整过拟合检测套件")
+async def run_overfit_check(req: OverfitCheckRequest):
+    """
+    运行完整过拟合检测套件。
+    包含 Walk-Forward + Purged K-Fold + PBO + DSR，
+    输出综合评分和结论。
+    """
+    from app.services.overfit_service import OverfitService
+
+    try:
+        svc = OverfitService()
+        result = svc.run_full_overfit_check(
+            req.strategy_name,
+            req.overall_start,
+            req.overall_end,
+            req.n_trials,
+            req.n_sub_periods,
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.exception(f"Overfit check failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Overfit check error: {e}")

@@ -1,17 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import {
-  NButton,
-  NDataTable,
-  NSpin,
-  NProgress,
-  NDatePicker,
-  NSelect,
-  NTag,
-  useMessage,
-} from 'naive-ui'
+import { NButton, NDataTable, NProgress, NDatePicker, NSelect, NTag, useMessage } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
 import { PhDatabase, PhArrowsClockwise, PhFunction, PhCalendarBlank } from '@phosphor-icons/vue'
+import ListSkeleton from '../components/skeleton/ListSkeleton.vue'
+import TableSkeleton from '../components/skeleton/TableSkeleton.vue'
 import {
   getDataStatus,
   syncData,
@@ -115,8 +108,10 @@ async function loadStatus() {
       rows.push({ date: ds, isTradeDay: tradeSet.has(ds) })
     }
     calendarRows.value = rows
-  } catch (e: unknown) {
-    message.error('加载状态失败')
+  } catch (err: any) {
+    // 忽略请求取消错误（来自 client.ts 的请求去重机制）
+    if (err?.code === 'ERR_CANCELED' || err?.name === 'CanceledError') return
+    console.error('Failed to load data status:', err)
   } finally {
     loading.value = false
   }
@@ -132,8 +127,10 @@ async function handleSync() {
     } else {
       message.error(`同步失败: ${result.message}`)
     }
-  } catch (e: unknown) {
-    message.error('同步请求失败')
+  } catch (err: any) {
+    // 忽略请求取消错误
+    if (err?.code === 'ERR_CANCELED' || err?.name === 'CanceledError') return
+    message.error(err?.response?.data?.detail || err?.message || '同步失败')
   } finally {
     syncing.value = false
   }
@@ -159,12 +156,12 @@ async function handleHistorySync() {
     })
     historySyncTask.value = task
     message.success(`历史同步任务已启动: ${task.task_id}`)
-    
+
     startPolling()
-  } catch (e: unknown) {
-    const err = e as { response?: { data?: { detail?: string } } }
-    const detail = err?.response?.data?.detail || '启动历史同步失败'
-    message.error(detail)
+  } catch (err: any) {
+    // 忽略请求取消错误
+    if (err?.code === 'ERR_CANCELED' || err?.name === 'CanceledError') return
+    message.error(err?.response?.data?.detail || err?.message || '启动历史同步失败')
   } finally {
     historySyncing.value = false
   }
@@ -189,12 +186,12 @@ async function pollHistorySyncStatus() {
     const status = await getHistorySyncStatus(taskId)
     if (status) {
       historySyncTask.value = status
-      
+
       if (status.status === 'completed') {
         stopPolling()
         message.success(
           `历史同步完成: ${status.progress.total_klines} 条K线 ` +
-          `(${status.progress.completed} 成功, ${status.progress.failed} 失败)`
+            `(${status.progress.completed} 成功, ${status.progress.failed} 失败)`
         )
         await loadStatus()
       } else if (status.status === 'failed') {
@@ -253,18 +250,15 @@ async function handleFactorCompute() {
 
     if (result?.data) {
       factorResult.value = result.data
-      message.success(
-        `因子计算完成: ${result.data.computed} 只成功, ${result.data.failed} 只失败`
-      )
+      message.success(`.factor计算完成: ${result.data.computed} 只成功, ${result.data.failed} 只失败`)
       await loadStatus()
     } else {
       message.error('因子计算返回异常')
     }
-  } catch (e: unknown) {
-    const err = e as { response?: { data?: { detail?: string } }; message?: string }
-    const detail = err?.response?.data?.detail || err?.message || '因子计算失败'
-    message.error(detail)
-    console.error('Factor compute error:', e)
+  } catch (err: any) {
+    // 忽略请求取消错误
+    if (err?.code === 'ERR_CANCELED' || err?.name === 'CanceledError') return
+    message.error(err?.response?.data?.detail || err?.message || '因子计算失败')
   } finally {
     factorComputing.value = false
   }
@@ -281,9 +275,8 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <NSpin :show="loading">
+  <div>
     <div class="flex flex-col gap-8">
-
       <!-- Operational header: sync action right-aligned -->
       <header class="flex items-center justify-between">
         <span class="text-sm text-[var(--color-text-muted)]">
@@ -302,7 +295,8 @@ onUnmounted(() => {
           <h3 class="section-title">概览</h3>
         </div>
         <div class="glass-panel overflow-hidden">
-          <div class="kv-grid">
+          <ListSkeleton v-if="loading" :rows="5" />
+          <div v-else class="kv-grid">
             <div
               v-for="(row, i) in statusRows"
               :key="row.key"
@@ -324,9 +318,7 @@ onUnmounted(() => {
         </div>
         <div class="glass-panel">
           <div class="section-body">
-            <p class="section-desc">
-              批量拉取全市场历史K线，约 30-60 分钟。支持断点续传。
-            </p>
+            <p class="section-desc">批量拉取全市场历史K线，约 30-60 分钟。支持断点续传。</p>
 
             <!-- Action bar -->
             <div class="sync-bar">
@@ -373,18 +365,12 @@ onUnmounted(() => {
           </div>
 
           <!-- Task Progress -->
-          <div
-            v-if="historySyncTask"
-            class="task-progress"
-            :class="taskBorderClass"
-          >
+          <div v-if="historySyncTask" class="task-progress" :class="taskBorderClass">
             <div class="task-head">
               <span class="task-status-label">
                 {{ getStatusText(historySyncTask.status) }}
               </span>
-              <span class="task-pct data-mono">
-                {{ historySyncStatus?.percent || 0 }}%
-              </span>
+              <span class="task-pct data-mono">{{ historySyncStatus?.percent || 0 }}%</span>
             </div>
 
             <NProgress
@@ -401,19 +387,30 @@ onUnmounted(() => {
               </div>
               <div class="task-metric">
                 <span class="task-metric-label">完成</span>
-                <span class="task-metric-val data-mono">{{ historySyncTask.progress.completed }}</span>
+                <span class="task-metric-val data-mono">
+                  {{ historySyncTask.progress.completed }}
+                </span>
               </div>
               <div class="task-metric">
                 <span class="task-metric-label">失败</span>
-                <span class="task-metric-val data-mono text-[var(--color-error)]">{{ historySyncTask.progress.failed }}</span>
+                <span class="task-metric-val data-mono text-[var(--color-error)]">
+                  {{ historySyncTask.progress.failed }}
+                </span>
               </div>
               <div class="task-metric">
                 <span class="task-metric-label">K线</span>
-                <span class="task-metric-val data-mono">{{ historySyncTask.progress.total_klines }}</span>
+                <span class="task-metric-val data-mono">
+                  {{ historySyncTask.progress.total_klines }}
+                </span>
               </div>
               <div class="task-metric task-metric--current">
                 <span class="task-metric-label">当前</span>
-                <NTag v-if="historySyncTask.progress.current_stock" size="small" round :bordered="false">
+                <NTag
+                  v-if="historySyncTask.progress.current_stock"
+                  size="small"
+                  round
+                  :bordered="false"
+                >
                   {{ historySyncTask.progress.current_stock }}
                 </NTag>
                 <span v-else class="task-metric-val text-[var(--color-text-muted)]">&mdash;</span>
@@ -423,7 +420,9 @@ onUnmounted(() => {
             <div class="task-meta">
               <span class="data-mono">{{ historySyncTask.task_id }}</span>
               <span class="task-meta-sep">/</span>
-              <span class="data-mono">{{ historySyncTask.start_date }} ~ {{ historySyncTask.end_date }}</span>
+              <span class="data-mono">
+                {{ historySyncTask.start_date }} ~ {{ historySyncTask.end_date }}
+              </span>
               <span class="task-meta-sep">/</span>
               <span>{{ new Date(historySyncTask.created_at).toLocaleString('zh-CN') }}</span>
             </div>
@@ -453,10 +452,7 @@ onUnmounted(() => {
             </NButton>
           </div>
 
-          <div
-            v-if="factorResult"
-            class="factor-result"
-          >
+          <div v-if="factorResult" class="factor-result">
             <div class="factor-result-head">
               <span class="factor-result-label">计算完成</span>
               <NTag size="small" :bordered="false" type="success" round>
@@ -465,11 +461,15 @@ onUnmounted(() => {
             </div>
             <div class="factor-result-grid">
               <div class="factor-stat">
-                <span class="factor-stat-val data-mono text-[var(--color-success)]">{{ factorResult.computed }}</span>
+                <span class="factor-stat-val data-mono text-[var(--color-success)]">
+                  {{ factorResult.computed }}
+                </span>
                 <span class="factor-stat-label">成功</span>
               </div>
               <div class="factor-stat">
-                <span class="factor-stat-val data-mono text-[var(--color-error)]">{{ factorResult.failed }}</span>
+                <span class="factor-stat-val data-mono text-[var(--color-error)]">
+                  {{ factorResult.failed }}
+                </span>
                 <span class="factor-stat-label">失败</span>
               </div>
               <div class="factor-stat">
@@ -488,7 +488,9 @@ onUnmounted(() => {
           <h3 class="section-title">近期交易日</h3>
         </div>
         <div class="glass-panel overflow-hidden">
+          <TableSkeleton v-if="loading" :columns="2" :rows="10" />
           <NDataTable
+            v-else
             :columns="calendarColumns"
             :data="calendarRows"
             size="small"
@@ -497,7 +499,7 @@ onUnmounted(() => {
         </div>
       </section>
     </div>
-  </NSpin>
+  </div>
 </template>
 
 <style scoped>

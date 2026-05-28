@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 全市场数据准备服务
 
@@ -8,42 +7,41 @@
 """
 
 import logging
-import json
+from datetime import datetime
+
 import numpy as np
 import pandas as pd
-from datetime import datetime
-from typing import Optional
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
-from app.database import get_db, DatabaseManager
-from app.models.stock_info import StockInfo
-from app.models.kline import Kline
+from app.database import DatabaseManager, get_db
 from app.models.factor import Factor
+from app.models.kline import Kline
+from app.models.stock_info import StockInfo
 
 logger = logging.getLogger(__name__)
 
 
 # AKShare 列名映射
 _COLUMN_MAP = {
-    '代码': 'ts_code',
-    '名称': 'name',
-    '最新价': 'close',
-    '涨跌幅': 'pct_chg',
-    '涨跌额': 'price_change',
-    '成交量': 'volume',
-    '成交额': 'amount',
-    '振幅': 'amplitude',
-    '最高': 'high',
-    '最低': 'low',
-    '今开': 'open',
-    '昨收': 'pre_close',
-    '量比': 'volume_ratio',
-    '换手率': 'turnover_rate',
-    '市盈率-动态': 'pe_ttm',
-    '市净率': 'pb',
-    '总市值': 'total_market_cap',
-    '流通市值': 'circ_market_cap',
-    '60日涨跌幅': 'ret_60d',
-    '年初至今涨跌幅': 'ret_ytd',
+    "代码": "ts_code",
+    "名称": "name",
+    "最新价": "close",
+    "涨跌幅": "pct_chg",
+    "涨跌额": "price_change",
+    "成交量": "volume",
+    "成交额": "amount",
+    "振幅": "amplitude",
+    "最高": "high",
+    "最低": "low",
+    "今开": "open",
+    "昨收": "pre_close",
+    "量比": "volume_ratio",
+    "换手率": "turnover_rate",
+    "市盈率-动态": "pe_ttm",
+    "市净率": "pb",
+    "总市值": "total_market_cap",
+    "流通市值": "circ_market_cap",
+    "年初至今涨跌幅": "ret_ytd",
 }
 
 
@@ -58,10 +56,10 @@ class DataPreparationService:
     4. 计算因子并写入 factor_daily
     """
 
-    def __init__(self, db: Optional[DatabaseManager] = None):
+    def __init__(self, db: DatabaseManager | None = None):
         self.db = db or get_db()
 
-    def prepare(self, trade_date: Optional[str] = None) -> dict:
+    def prepare(self, trade_date: str | None = None) -> dict:
         """
         全量数据准备: 拉取快照 → 写入DB → 计算因子。
 
@@ -72,13 +70,14 @@ class DataPreparationService:
             dict with synced/failed counts
         """
         if trade_date is None:
-            trade_date = datetime.now().strftime('%Y-%m-%d')
+            trade_date = datetime.now().strftime("%Y-%m-%d")
 
         logger.info(f"[数据准备] 开始全市场数据准备, 目标日期: {trade_date}")
 
         # Step 1: 拉取全A股快照
         try:
             from data_provider.akshare_fetcher import fetch_all_a_share_snapshot
+
             df = fetch_all_a_share_snapshot()
         except Exception as e:
             logger.error(f"[数据准备] 全A股快照拉取失败 (已重试5次): {e}")
@@ -98,15 +97,16 @@ class DataPreparationService:
             return {"synced": 0, "failed": 0, "error": "快照数据为空"}
 
         # Detect data source
-        source = df['_source'].iloc[0] if '_source' in df.columns else 'unknown'
-        df = df.drop(columns=['_source'], errors='ignore')
+        source = df["_source"].iloc[0] if "_source" in df.columns else "unknown"
+        df = df.drop(columns=["_source"], errors="ignore")
         logger.info(f"[数据准备] 数据源: {source}, 股票数: {len(df)}")
 
         # For Sina source: filter out ETF codes (they are mixed in)
-        if source == 'sina':
+        if source == "sina":
             from data_provider.base import _is_etf_code
+
             before = len(df)
-            code_col = '代码' if '代码' in df.columns else 'ts_code'
+            code_col = "代码" if "代码" in df.columns else "ts_code"
             df = df[~df[code_col].apply(lambda x: _is_etf_code(str(x)))]
             logger.info(f"[数据准备] Sina 模式: 过滤 ETF, {before} -> {len(df)} 只")
 
@@ -115,14 +115,24 @@ class DataPreparationService:
 
         # Step 3: 数值列转换
         numeric_cols = [
-            'close', 'pct_chg', 'volume', 'amount', 'high', 'low',
-            'open', 'pre_close', 'volume_ratio', 'turnover_rate',
-            'pe_ttm', 'pb', 'total_market_cap', 'circ_market_cap',
-            'ret_60d',
+            "close",
+            "pct_chg",
+            "volume",
+            "amount",
+            "high",
+            "low",
+            "open",
+            "pre_close",
+            "volume_ratio",
+            "turnover_rate",
+            "pe_ttm",
+            "pb",
+            "total_market_cap",
+            "circ_market_cap",
         ]
         for col in numeric_cols:
             if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors='coerce')
+                df[col] = pd.to_numeric(df[col], errors="coerce")
 
         logger.info(f"[数据准备] 快照解析完成: {len(df)} 只股票")
 
@@ -134,142 +144,191 @@ class DataPreparationService:
         kline_count = self._save_kline_daily(df, trade_date)
         logger.info(f"[数据准备] 写入 kline_daily: {kline_count} 条")
 
-        # Step 6: 计算因子并写入 factor_daily
+        # Step 6: 计算截面因子并写入 factor_daily
         factor_count = self._compute_and_save_factors(df, trade_date)
-        logger.info(f"[数据准备] 写入 factor_daily: {factor_count} 条")
+        logger.info(f"[数据准备] 写入截面因子: {factor_count} 条")
+
+        # Step 6.5: 同步基本面因子 (批量接口, stock_yjbb_em)
+        fundamental_count = 0
+        try:
+            from app.services.fundamental_sync_task import sync_fundamental_factors
+
+            fund_result = sync_fundamental_factors(trade_date=trade_date, sync_per_stock=False)
+            fundamental_count = fund_result.get("batch", 0)
+            logger.info(
+                f"[数据准备] 同步基本面因子: {fundamental_count} 条 (报告期: {fund_result.get('report_date', 'N/A')})"
+            )
+        except Exception as e:
+            logger.warning(f"[数据准备] 基本面因子同步跳过: {e}")
+
+        # Step 7: 从 K 线历史数据计算时序因子 (ret_20d, ret_60d_vol, turnover_20d)
+        ts_factor_count = 0
+        ts_factor_failed = 0
+        try:
+            from app.services.factor_compute_service import FactorComputeService
+
+            factor_service = FactorComputeService()
+            ts_result = factor_service.compute_factors_for_date(trade_date)
+            ts_factor_count = ts_result.get("computed", 0)
+            ts_factor_failed = ts_result.get("failed", 0)
+            logger.info(f"[数据准备] 写入时序因子: {ts_factor_count} 条, 失败 {ts_factor_failed} 条 (需历史 K 线数据)")
+        except Exception as e:
+            logger.warning(f"[数据准备] 时序因子计算跳过 (历史 K 线不足): {e}")
 
         return {
             "trade_date": trade_date,
             "source": source,
             "synced": kline_count,
             "factor_count": factor_count,
+            "fundamental_count": fundamental_count,
+            "ts_factor_count": ts_factor_count,
             "stock_count": stock_count,
         }
 
     def _save_stock_info(self, df: pd.DataFrame) -> int:
-        """写入股票基本信息"""
+        """写入股票基本信息 (批量 Upsert)"""
         now = datetime.now().isoformat()
-        stocks = []
+        rows = []
         for _, row in df.iterrows():
-            ts_code = row.get('ts_code')
+            ts_code = row.get("ts_code")
             if not ts_code or pd.isna(ts_code):
                 continue
-            stock = StockInfo(
-                ts_code=str(ts_code),
-                name=str(row.get('name', '')) if pd.notna(row.get('name')) else None,
-                is_st=int('ST' in str(row.get('name', '')).upper()),
-                updated_at=now,
+            rows.append(
+                {
+                    "ts_code": str(ts_code),
+                    "name": str(row.get("name", "")) if pd.notna(row.get("name")) else None,
+                    "is_st": int("ST" in str(row.get("name", "")).upper()),
+                    "updated_at": now,
+                }
             )
-            stocks.append(stock)
 
-        if not stocks:
+        if not rows:
             return 0
 
-        count = 0
+        batch_size = 1000
+        total = 0
+
         with self.db.get_session() as session:
-            for stock in stocks:
-                existing = session.get(StockInfo, stock.ts_code)
-                if existing:
-                    if stock.name:
-                        existing.name = stock.name
-                    existing.is_st = stock.is_st
-                    existing.updated_at = stock.updated_at
-                else:
-                    session.add(stock)
-                count += 1
+            for i in range(0, len(rows), batch_size):
+                batch = rows[i : i + batch_size]
+                stmt = sqlite_insert(StockInfo).values(batch)
+                # ON CONFLICT DO UPDATE: 主键冲突时更新非主键字段
+                stmt = stmt.on_conflict_do_update(
+                    index_elements=["ts_code"],
+                    set_={
+                        "name": stmt.excluded.name,
+                        "is_st": stmt.excluded.is_st,
+                        "updated_at": stmt.excluded.updated_at,
+                    },
+                )
+                session.exec(stmt)
+                total += len(batch)
             session.commit()
-        return count
+
+        return total
 
     def _save_kline_daily(self, df: pd.DataFrame, trade_date: str) -> int:
-        """写入当日K线数据"""
-        klines = []
+        """写入当日K线数据 (批量 Upsert)"""
+        rows = []
         for _, row in df.iterrows():
-            ts_code = row.get('ts_code')
+            ts_code = row.get("ts_code")
             if not ts_code or pd.isna(ts_code):
                 continue
 
-            close_val = _safe_float(row.get('close'))
+            close_val = _safe_float(row.get("close"))
             if close_val is None or close_val <= 0:
                 continue
 
-            kline = Kline(
-                ts_code=str(ts_code),
-                trade_date=trade_date,
-                open=_safe_float(row.get('open')),
-                high=_safe_float(row.get('high')),
-                low=_safe_float(row.get('low')),
-                close=close_val,
-                volume=_safe_float(row.get('volume')),
-                amount=_safe_float(row.get('amount')),
-                close_adj=close_val,  # 快照数据是当日价，复权价 = 收盘价 for now
-                volume_ratio=_safe_float(row.get('volume_ratio')),
-                turnover_rate=_safe_float(row.get('turnover_rate')),
-                is_limit_up=1 if _safe_float(row.get('pct_chg')) and abs(_safe_float(row.get('pct_chg')) - 10.0) < 0.1 else 0,
-                is_limit_down=1 if _safe_float(row.get('pct_chg')) and abs(_safe_float(row.get('pct_chg')) + 10.0) < 0.1 else 0,
-                data_source='ak_spot',
+            pct_val = _safe_float(row.get("pct_chg"))
+            rows.append(
+                {
+                    "ts_code": str(ts_code),
+                    "trade_date": trade_date,
+                    "open": _safe_float(row.get("open")),
+                    "high": _safe_float(row.get("high")),
+                    "low": _safe_float(row.get("low")),
+                    "close": close_val,
+                    "volume": _safe_float(row.get("volume")),
+                    "amount": _safe_float(row.get("amount")),
+                    "close_adj": close_val,
+                    "volume_ratio": _safe_float(row.get("volume_ratio")),
+                    "turnover_rate": _safe_float(row.get("turnover_rate")),
+                    "is_limit_up": 1 if pct_val and abs(pct_val - 10.0) < 0.1 else 0,
+                    "is_limit_down": 1 if pct_val and abs(pct_val + 10.0) < 0.1 else 0,
+                    "data_source": "ak_spot",
+                }
             )
-            klines.append(kline)
 
-        if not klines:
+        if not rows:
             return 0
 
-        count = 0
+        batch_size = 1000
+        total = 0
+
         with self.db.get_session() as session:
-            for kline in klines:
-                existing = session.get(Kline, (kline.ts_code, kline.trade_date))
-                if existing:
-                    session.merge(kline)
-                else:
-                    session.add(kline)
-                count += 1
+            for i in range(0, len(rows), batch_size):
+                batch = rows[i : i + batch_size]
+                stmt = sqlite_insert(Kline).values(batch)
+                # 复合主键冲突: (ts_code, trade_date)
+                stmt = stmt.on_conflict_do_update(
+                    index_elements=["ts_code", "trade_date"],
+                    set_={
+                        "open": stmt.excluded.open,
+                        "high": stmt.excluded.high,
+                        "low": stmt.excluded.low,
+                        "close": stmt.excluded.close,
+                        "volume": stmt.excluded.volume,
+                        "amount": stmt.excluded.amount,
+                        "close_adj": stmt.excluded.close_adj,
+                        "volume_ratio": stmt.excluded.volume_ratio,
+                        "turnover_rate": stmt.excluded.turnover_rate,
+                        "is_limit_up": stmt.excluded.is_limit_up,
+                        "is_limit_down": stmt.excluded.is_limit_down,
+                        "data_source": stmt.excluded.data_source,
+                    },
+                )
+                session.exec(stmt)
+                total += len(batch)
             session.commit()
-        return count
+
+        return total
 
     def _compute_and_save_factors(self, df: pd.DataFrame, trade_date: str) -> int:
         """
-        从快照数据计算可用因子并写入 factor_daily。
+        Compute cross-sectional factors from snapshot data (批量 Upsert).
 
-        可从快照直接计算的因子:
+        Cross-sectional factors (computed here):
         - pe_ttm: 市盈率-动态
         - pb: 市净率
-        - turnover_20d: 换手率 (快照只提供当日换手率，作为代理值)
-        - ret_20d: 用 60日涨跌幅的 1/3 近似
-        - ret_60d_vol: 暂用振幅近似 (高-低/昨收)
         - ln_market_cap: ln(流通市值)
 
-        需要基本面数据的因子 (暂缺):
-        - ps_ttm, fcf_yield, roe_ttm, gross_margin,
-          rev_growth_yoy, ear_growth_yoy, inst_holding_chg
+        Time-series factors (computed by FactorComputeService):
+        - ret_20d, ret_60d_vol, turnover_20d require historical K-line data
+          and are computed separately to avoid incorrect approximations.
+
+        基本面因子 (由 FundamentalSyncTask 从 AKShare 批量同步):
+        ps_ttm, fcf_yield, roe_ttm, gross_margin,
+        rev_growth_yoy, ear_growth_yoy, inst_holding_chg
+
+        改造要点:
+        - 批量 INSERT ON CONFLICT DO UPDATE, 仅更新截面字段
+        - 保留时序因子字段 (ret_20d, ret_60d_vol, turnover_20d) 不被覆盖
         """
-        now = datetime.now().isoformat()
-        factors = []
+        rows = []
 
         for _, row in df.iterrows():
-            ts_code = row.get('ts_code')
+            ts_code = row.get("ts_code")
             if not ts_code or pd.isna(ts_code):
                 continue
 
-            close_val = _safe_float(row.get('close'))
+            close_val = _safe_float(row.get("close"))
             if close_val is None or close_val <= 0:
                 continue
 
-            # 因子计算
-            pe = _safe_float(row.get('pe_ttm'))
-            pb = _safe_float(row.get('pb'))
-            turnover = _safe_float(row.get('turnover_rate'))
-            ret_60d = _safe_float(row.get('ret_60d'))
-            circ_mv = _safe_float(row.get('circ_market_cap'))
-            high = _safe_float(row.get('high'))
-            low = _safe_float(row.get('low'))
-            pre_close = _safe_float(row.get('pre_close'))
-
-            # 波动率: 振幅近似 (高-低)/昨收
-            ret_60d_vol = None
-            if high and low and pre_close and pre_close > 0:
-                ret_60d_vol = (high - low) / pre_close
-
-            # 动量: 60日涨跌幅作为代理
-            ret_20d = ret_60d / 3.0 if ret_60d is not None else None
+            # 截面因子计算 (仅依赖当日快照)
+            pe = _safe_float(row.get("pe_ttm"))
+            pb = _safe_float(row.get("pb"))
+            circ_mv = _safe_float(row.get("circ_market_cap"))
 
             # 对数市值
             ln_market_cap = np.log(circ_mv) if circ_mv and circ_mv > 0 else None
@@ -278,50 +337,51 @@ class DataPreparationService:
             if pe is not None and (pe < 0 or pe > 500):
                 pe = None
 
-            factor = Factor(
-                ts_code=str(ts_code),
-                trade_date=trade_date,
-                pe_ttm=pe,
-                pb=pb,
-                turnover_20d=turnover,
-                ret_20d=ret_20d,
-                ret_60d_vol=ret_60d_vol,
-                ln_market_cap=ln_market_cap,
+            rows.append(
+                {
+                    "ts_code": str(ts_code),
+                    "trade_date": trade_date,
+                    "pe_ttm": pe,
+                    "pb": pb,
+                    "ln_market_cap": ln_market_cap,
+                }
             )
-            factors.append(factor)
 
-        if not factors:
+        if not rows:
             return 0
 
-        # 删除当日旧数据
-        from sqlmodel import select
+        batch_size = 1000
+        total = 0
+
+        # 单会话, 单事务: 批量 upsert 截面因子, 保留时序字段
         with self.db.get_session() as session:
-            # Delete existing factors for this date
-            existing = session.exec(
-                select(Factor).where(Factor.trade_date == trade_date)
-            ).all()
-            for f in existing:
-                session.delete(f)
+            for i in range(0, len(rows), batch_size):
+                batch = rows[i : i + batch_size]
+                stmt = sqlite_insert(Factor).values(batch)
+                # 复合主键冲突: (ts_code, trade_date)
+                # 仅更新截面字段, 保留时序因子和基本面因子数据
+                stmt = stmt.on_conflict_do_update(
+                    index_elements=["ts_code", "trade_date"],
+                    set_={
+                        "pe_ttm": stmt.excluded.pe_ttm,
+                        "pb": stmt.excluded.pb,
+                        "ln_market_cap": stmt.excluded.ln_market_cap,
+                    },
+                )
+                session.exec(stmt)
+                total += len(batch)
             session.commit()
 
-        # 写入新数据
-        count = 0
-        with self.db.get_session() as session:
-            for factor in factors:
-                session.add(factor)
-                count += 1
-            session.commit()
-
-        return count
+        return total
 
 
-def _safe_float(val) -> Optional[float]:
+def _safe_float(val) -> float | None:
     """安全转换为 float"""
     if val is None:
         return None
     if isinstance(val, float) and pd.isna(val):
         return None
-    if isinstance(val, str) and val.strip() == '-':
+    if isinstance(val, str) and val.strip() == "-":
         return None
     try:
         return float(val)

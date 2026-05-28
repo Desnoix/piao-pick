@@ -1,24 +1,32 @@
-import { apiClient } from './client'
+import { apiClient, type RequestOptions } from './client'
 import type { DataStatus, TradeCalendar, SyncRequest, SyncResponse } from '../types/api'
 
-export async function getDataStatus(): Promise<DataStatus> {
-  const { data } = await apiClient.get('/data/status')
+export async function getDataStatus(options?: RequestOptions): Promise<DataStatus> {
+  const { data } = await apiClient.get('/data/status', {
+    ...(options?.silent ? { __silent: true } : {}),
+  } as any)
   return data
 }
 
-export async function syncData(req: SyncRequest): Promise<SyncResponse> {
-  const { data } = await apiClient.post('/data/sync', req)
+export async function syncData(req: SyncRequest, options?: RequestOptions): Promise<SyncResponse> {
+  const { data } = await apiClient.post('/data/sync', req, {
+    ...(options?.silent ? { __silent: true } : {}),
+  } as any)
   return data
 }
 
 export async function getTradeCalendar(
   start_date?: string,
-  end_date?: string
+  end_date?: string,
+  options?: RequestOptions
 ): Promise<TradeCalendar> {
   const params: Record<string, any> = {}
   if (start_date) params.start_date = start_date
   if (end_date) params.end_date = end_date
-  const { data } = await apiClient.get('/data/trade-calendar', { params })
+  const { data } = await apiClient.get('/data/trade-calendar', {
+    params,
+    ...(options?.silent ? { __silent: true } : {}),
+  } as any)
   return data
 }
 
@@ -49,19 +57,35 @@ export interface HistorySyncProgress {
   error_messages: string | null
 }
 
-export async function startHistorySync(req: HistorySyncRequest): Promise<HistorySyncProgress> {
-  const { data } = await apiClient.post('/data/history-sync', req)
+export async function startHistorySync(
+  req: HistorySyncRequest,
+  options?: RequestOptions
+): Promise<HistorySyncProgress> {
+  const { data } = await apiClient.post('/data/history-sync', req, {
+    ...(options?.silent ? { __silent: true } : {}),
+  } as any)
   return data.data
 }
 
-export async function getHistorySyncStatus(taskId?: string): Promise<HistorySyncProgress | null> {
+export async function getHistorySyncStatus(
+  taskId?: string,
+  options?: RequestOptions
+): Promise<HistorySyncProgress | null> {
   const url = taskId ? `/data/history-sync/${taskId}` : '/data/history-sync/status'
-  const { data } = await apiClient.get(url)
+  const { data } = await apiClient.get(url, {
+    ...(options?.silent ? { __silent: true } : {}),
+  } as any)
   return data.data
 }
 
-export async function listHistorySyncTasks(limit: number = 10): Promise<HistorySyncProgress[]> {
-  const { data } = await apiClient.get('/data/history-sync/history', { params: { limit } })
+export async function listHistorySyncTasks(
+  limit: number = 10,
+  options?: RequestOptions
+): Promise<HistorySyncProgress[]> {
+  const { data } = await apiClient.get('/data/history-sync/history', {
+    params: { limit },
+    ...(options?.silent ? { __silent: true } : {}),
+  } as any)
   return data.data
 }
 
@@ -71,7 +95,12 @@ export interface FactorComputeRequest {
   stock_codes?: string[]
 }
 
-export async function computeFactors(req?: FactorComputeRequest): Promise<any> {
-  const { data } = await apiClient.post('/data/factor-compute', req || {})
+export async function computeFactors(
+  req?: FactorComputeRequest,
+  options?: RequestOptions
+): Promise<any> {
+  const { data } = await apiClient.post('/data/factor-compute', req || {}, {
+    ...(options?.silent ? { __silent: true } : {}),
+  } as any)
   return data
 }

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 策略加载器（Phase 2 实现）
 
@@ -8,7 +7,6 @@
 import logging
 import uuid
 from datetime import datetime
-from typing import Optional
 from pathlib import Path
 
 import yaml
@@ -33,8 +31,17 @@ class StrategyConfig:
         self.default_priority: int = raw.get("default_priority", 50)
         self.universe: dict = raw.get("universe", {})
         self.factors: list[dict] = raw.get("factors", [])
+        self.neutralization: dict = raw.get("neutralization", {})
         self.filters: list[dict] = raw.get("filters", [])
         self.output: dict = raw.get("output", {})
+        self.factor_pipeline: dict = raw.get("factor_pipeline", {})
+
+        # 因子合成配置 (composite method: fixed | icir | equal)
+        composite_raw = raw.get("composite", {})
+        self.composite_method: str = composite_raw.get("method", "fixed")
+        self.icir_lookback: int = composite_raw.get("icir_lookback", 12)
+        self.icir_min_periods: int = composite_raw.get("icir_min_periods", 6)
+        self.max_single_weight: float = composite_raw.get("max_single_weight", 0.40)
 
 
 class StrategyLoader:
@@ -48,7 +55,7 @@ class StrategyLoader:
     - 支持热更新策略配置
     """
 
-    def __init__(self, strategies_dir: Optional[str] = None):
+    def __init__(self, strategies_dir: str | None = None):
         config = get_config()
         self.strategies_dir = Path(strategies_dir or config.strategies_dir)
         logger.info(f"StrategyLoader initialized: {self.strategies_dir}")
@@ -76,16 +83,16 @@ class StrategyLoader:
 
         return configs
 
-    def load_by_name(self, name: str) -> Optional[StrategyConfig]:
+    def load_by_name(self, name: str) -> StrategyConfig | None:
         """加载指定名称的策略"""
         yaml_file = self.strategies_dir / f"{name}.yaml"
         if not yaml_file.exists():
             return None
         return self._load_file(yaml_file)
 
-    def _load_file(self, path: Path) -> Optional[StrategyConfig]:
+    def _load_file(self, path: Path) -> StrategyConfig | None:
         """从 YAML 文件加载策略配置"""
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             raw = yaml.safe_load(f)
         if not raw or not isinstance(raw, dict):
             return None

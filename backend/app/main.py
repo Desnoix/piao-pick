@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 FastAPI 应用工厂
 
@@ -6,11 +5,9 @@ FastAPI 应用工厂
 """
 
 import logging
-import os
 from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -45,7 +42,7 @@ async def app_lifespan(app: FastAPI):
         logger.info("Scheduler stopped")
 
 
-def create_app(static_dir: Optional[Path] = None) -> FastAPI:
+def create_app(static_dir: Path | None = None) -> FastAPI:
     """
     创建并配置 FastAPI 应用实例。
 

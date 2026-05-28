@@ -10,6 +10,7 @@ import { RadarChart } from 'echarts/charts'
 import { TooltipComponent, RadarComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 import { FACTOR_LABELS } from '../../utils/constants'
+import { zScoreToPercentile } from '../../utils/format'
 
 use([RadarChart, TooltipComponent, RadarComponent, CanvasRenderer])
 
@@ -40,7 +41,7 @@ const option = computed(() => {
     max: 100,
   }))
 
-  const values = Object.values(props.factors)
+  const values = Object.values(props.factors).map(zScoreToPercentile)
   const theme = props.theme
 
   // Derive colors from theme or fallback
@@ -57,6 +58,17 @@ const option = computed(() => {
     tooltip: {
       ...tooltipConfig,
       trigger: 'item',
+      formatter() {
+        const keys = Object.keys(props.factors)
+        const vals = Object.values(props.factors)
+        let html = '<div style="font-size:12px">'
+        keys.forEach((k, i) => {
+          const z = vals[i] as number,
+            s = z > 0 ? '+' : ''
+          html += `${FACTOR_LABELS[k] || k}: P${zScoreToPercentile(z)} <span style="opacity:.6">(${s}${z.toFixed(2)}σ)</span><br/>`
+        })
+        return html + '</div>'
+      },
     },
     radar: {
       indicator: indicators,
@@ -110,7 +122,7 @@ const option = computed(() => {
 </script>
 
 <template>
-  <div class="w-full h-[400px]">
+  <div class="h-[400px] w-full">
     <VChart :option="option" autoresize />
   </div>
 </template>

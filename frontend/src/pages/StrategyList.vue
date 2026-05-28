@@ -3,9 +3,11 @@ import { h, ref, onMounted, computed } from 'vue'
 import { NDataTable, NButton, NSpace, NTag, NSwitch, NAlert, useMessage, useDialog } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
 import { useRouter } from 'vue-router'
+import TableSkeleton from '../components/skeleton/TableSkeleton.vue'
 import { PhPlus, PhSlidersHorizontal } from '@phosphor-icons/vue'
 import { useStrategyStore } from '../stores/strategy'
 import { updateStrategy } from '../api/strategies'
+import { getAllFactorCoverage, type FactorCoverageData } from '../api/factorCoverage'
 import type { Strategy } from '../types/strategy'
 
 const router = useRouter()
@@ -15,6 +17,7 @@ const dialog = useDialog()
 
 const selectedIds = ref<string[]>([])
 const fetchError = ref<string | null>(null)
+const coverageMap = ref<Record<string, FactorCoverageData>>({})
 
 const compareDisabled = computed(() => {
   return selectedIds.value.length < 2 || selectedIds.value.length > 4
@@ -51,6 +54,19 @@ const columns: DataTableColumns<Strategy> = [
     width: 120,
     render(row) {
       return row.category || '-'
+    },
+  },
+  {
+    title: '因子覆盖',
+    key: 'coverage',
+    width: 100,
+    render(row) {
+      const cov = row.name ? coverageMap.value[row.name] : undefined
+      if (!cov) return h('span', { class: 'text-[var(--color-text-muted)]' }, '—')
+      const pct = (cov.coverage_rate * 100).toFixed(0)
+      const tagType =
+        cov.coverage_rate >= 0.9 ? 'success' : cov.coverage_rate >= 0.6 ? 'warning' : 'error'
+      return h(NTag, { type: tagType, size: 'small', class: 'data-mono' }, () => `${pct}%`)
     },
   },
   {
@@ -105,7 +121,7 @@ const columns: DataTableColumns<Strategy> = [
               await strategyStore.fetchStrategies()
               message.success(val ? '已启用' : '已停用')
             } catch {
-              message.error('操作失败')
+              // 拦截器已统一提示
             }
           },
         }),
@@ -126,7 +142,7 @@ const columns: DataTableColumns<Strategy> = [
                     await strategyStore.removeStrategy(row.id)
                     message.success('已删除')
                   } catch {
-                    message.error('删除失败')
+                    // 拦截器已统一提示
                   }
                 },
               })
@@ -141,9 +157,21 @@ const columns: DataTableColumns<Strategy> = [
 
 onMounted(async () => {
   try {
-    await strategyStore.fetchStrategies()
+    await strategyStore.fetchStrategies({ silent: true })
   } catch (e: any) {
     fetchError.value = e?.response?.data?.detail || e?.message || '加载策略失败'
+  }
+
+  // Load factor coverage for all strategies (non-blocking)
+  try {
+    const result = await getAllFactorCoverage()
+    const map: Record<string, FactorCoverageData> = {}
+    for (const cov of result.strategies) {
+      map[cov.strategy_name] = cov
+    }
+    coverageMap.value = map
+  } catch {
+    // Coverage is non-critical; silently ignore
   }
 })
 </script>
@@ -151,12 +179,14 @@ onMounted(async () => {
 <template>
   <div class="flex flex-col gap-8">
     <!-- Action bar -->
-    <div class="flex items-center gap-2 flex-wrap">
+    <div class="flex flex-wrap items-center gap-2">
       <button
-        class="inline-flex items-center gap-2 rounded-full px-4 py-2 border text-sm transition-all"
-        :class="compareDisabled
-          ? 'border-[var(--color-border)] text-[var(--color-text-muted)] opacity-50 cursor-not-allowed'
-          : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] hover:bg-[var(--color-accent-muted)] cursor-pointer'"
+        class="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm transition-all"
+        :class="
+          compareDisabled
+            ? 'cursor-not-allowed border-[var(--color-border)] text-[var(--color-text-muted)] opacity-50'
+            : 'cursor-pointer border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-accent)] hover:bg-[var(--color-accent-muted)] hover:text-[var(--color-accent)]'
+        "
         :disabled="compareDisabled"
         @click="handleCompare"
       >
@@ -173,14 +203,27 @@ onMounted(async () => {
     <NAlert v-if="fetchError" type="error" closable @close="fetchError = null">
       <div class="flex items-center justify-between">
         <span>{{ fetchError }}</span>
-        <NButton size="small" @click="() => { fetchError = null; strategyStore.fetchStrategies().catch((e: any) => { fetchError = e?.response?.data?.detail || e?.message || '加载策略失败' }) }">
+        <NButton
+          size="small"
+          @click="
+            () => {
+              fetchError = null
+              strategyStore.fetchStrategies({ silent: true }).catch((e: any) => {
+                fetchError = e?.response?.data?.detail || e?.message || '加载策略失败'
+              })
+            }
+          "
+        >
           重试
         </NButton>
       </div>
     </NAlert>
 
     <!-- Strategy table -->
-    <div v-if="strategyStore.strategies.length > 0 || strategyStore.loading" class="glass-panel overflow-hidden strategy-table">
+    <div
+      v-if="strategyStore.strategies.length > 0"
+      class="glass-panel strategy-table overflow-hidden"
+    >
       <NDataTable
         :columns="columns"
         :data="strategyStore.strategies"
@@ -193,6 +236,11 @@ onMounted(async () => {
       />
     </div>
 
+    <!-- Loading skeleton -->
+    <div v-else-if="strategyStore.loading" class="glass-panel overflow-hidden">
+      <TableSkeleton :columns="5" :rows="6" />
+    </div>
+
     <!-- Empty state -->
     <div
       v-if="strategyStore.strategies.length === 0 && !strategyStore.loading && !fetchError"
@@ -200,11 +248,11 @@ onMounted(async () => {
     >
       <PhSlidersHorizontal
         :size="64"
-        class="text-[var(--color-text-muted)] opacity-30 mb-5"
+        class="mb-5 text-[var(--color-text-muted)] opacity-30"
         weight="duotone"
       />
-      <p class="text-base font-medium text-[var(--color-text-secondary)] mb-2">暂无策略</p>
-      <p class="text-sm text-[var(--color-text-muted)] mb-5">创建你的第一个量化策略</p>
+      <p class="mb-2 text-base font-medium text-[var(--color-text-secondary)]">暂无策略</p>
+      <p class="mb-5 text-sm text-[var(--color-text-muted)]">创建你的第一个量化策略</p>
       <NButton type="primary" @click="router.push('/strategy/new')">
         <template #icon><PhPlus :size="16" /></template>
         新建策略

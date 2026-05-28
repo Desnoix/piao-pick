@@ -34,19 +34,17 @@ const trendBarColor = computed(() => {
 </script>
 
 <template>
-  <div
-    class="glass-panel relative overflow-hidden"
-  >
+  <div class="glass-panel relative overflow-hidden">
     <!-- Trend indicator bar -->
     <div
-      class="absolute top-0 left-0 right-0 h-[2px]"
+      class="absolute top-0 right-0 left-0 h-[2px]"
       :style="{ backgroundColor: trendBarColor }"
     />
     <div class="p-4">
-      <div class="text-xs mb-1.5 text-[var(--color-text-secondary)]">
+      <div class="mb-1.5 text-xs text-[var(--color-text-secondary)]">
         {{ label }}
       </div>
-      <div class="text-2xl font-bold data-mono" :style="{ color: valueColor }">
+      <div class="data-mono text-2xl font-bold" :style="{ color: valueColor }">
         {{ displayValue }}
       </div>
     </div>

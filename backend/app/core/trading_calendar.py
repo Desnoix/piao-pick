@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 ===================================
 Trading Calendar Module (A-share only)
@@ -15,7 +14,6 @@ Dependencies: exchange-calendars (optional, fail-open when unavailable)
 
 import logging
 from datetime import date, datetime
-from typing import List, Optional
 from zoneinfo import ZoneInfo
 
 logger = logging.getLogger(__name__)
@@ -24,11 +22,11 @@ logger = logging.getLogger(__name__)
 _XCALS_AVAILABLE = False
 try:
     import exchange_calendars as xcals
+
     _XCALS_AVAILABLE = True
 except ImportError:
     logger.warning(
-        "exchange-calendars not installed; trading day check disabled. "
-        "Install with: pip install exchange-calendars"
+        "exchange-calendars not installed; trading day check disabled. Install with: pip install exchange-calendars"
     )
 
 # A-share market: Shanghai Stock Exchange
@@ -36,7 +34,7 @@ MARKET_EXCHANGE = "XSHG"
 MARKET_TIMEZONE = "Asia/Shanghai"
 
 
-def get_market_now(current_time: Optional[datetime] = None) -> datetime:
+def get_market_now(current_time: datetime | None = None) -> datetime:
     """
     Return current time in A-share market timezone (Asia/Shanghai).
 
@@ -90,7 +88,7 @@ def is_market_open(check_date: date) -> bool:
 
 
 def get_effective_trading_date(
-    current_time: Optional[datetime] = None,
+    current_time: datetime | None = None,
 ) -> date:
     """
     Resolve the latest reusable daily-bar date for checkpoint/resume logic.
@@ -152,7 +150,7 @@ def get_effective_trading_date(
 def get_trade_dates_between(
     start_date: date,
     end_date: date,
-) -> List[date]:
+) -> list[date]:
     """
     Get list of trading dates between start_date and end_date (inclusive).
 

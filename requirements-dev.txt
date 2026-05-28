@@ -1,0 +1,12 @@
+-r ./requirements.txt
+# Code quality
+ruff>=0.9.0
+mypy>=1.14.0
+# Type stubs for third-party libraries
+types-PyYAML>=6.0.0
+types-requests>=2.31.0
+types-python-dateutil>=2.8.0
+# Testing
+pytest>=8.3.0
+pytest-cov>=6.0.0
+pytest-asyncio>=0.24.0

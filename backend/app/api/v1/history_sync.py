@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 历史数据同步 API 接口
 
@@ -9,7 +8,6 @@
 """
 
 import logging
-from typing import Optional
 from datetime import datetime
 
 from fastapi import APIRouter, HTTPException
@@ -24,9 +22,9 @@ router = APIRouter()
 
 class HistorySyncRequest(BaseModel):
     start_date: str  # YYYY-MM-DD
-    end_date: Optional[str] = None  # YYYY-MM-DD, 默认今天
+    end_date: str | None = None  # YYYY-MM-DD, 默认今天
     adjust_type: str = "qfq"  # 复权类型
-    stock_codes: Optional[list[str]] = None  # 指定股票代码，None 表示全市场
+    stock_codes: list[str] | None = None  # 指定股票代码，None 表示全市场
     use_existing: bool = False  # 如果已有活跃任务是否复用
 
 
@@ -37,24 +35,24 @@ class HistorySyncResponse(BaseModel):
     end_date: str
     progress: dict
     created_at: str
-    started_at: Optional[str]
-    completed_at: Optional[str]
-    error_messages: Optional[str]
+    started_at: str | None
+    completed_at: str | None
+    error_messages: str | None
 
 
 @router.post("/history-sync", summary="启动历史数据同步")
 async def start_history_sync(req: HistorySyncRequest):
     """
     启动历史数据同步任务。
-    
+
     后台异步执行，支持断点续传和限速控制。
     """
     try:
         service = HistoricalDataService()
-        
+
         # 设置结束日期
         end_date = req.end_date or datetime.now().strftime("%Y-%m-%d")
-        
+
         # 启动同步任务
         task = service.start_sync(
             start_date=req.start_date,
@@ -63,16 +61,16 @@ async def start_history_sync(req: HistorySyncRequest):
             stock_codes=req.stock_codes,
             use_existing_task=req.use_existing,
         )
-        
+
         # 获取任务状态
         status = service.get_task_status(task.task_id)
-        
+
         return {
             "success": True,
             "message": f"History sync task started: {task.task_id}",
             "data": status,
         }
-        
+
     except Exception as e:
         logger.error(f"Failed to start history sync: {e}", exc_info=True)
         raise HTTPException(
@@ -87,19 +85,19 @@ async def get_latest_sync_status():
     try:
         service = HistoricalDataService()
         status = service.get_task_status()
-        
+
         if not status:
             return {
                 "success": True,
                 "message": "No sync tasks found",
                 "data": None,
             }
-        
+
         return {
             "success": True,
             "data": status,
         }
-        
+
     except Exception as e:
         logger.error(f"Failed to get sync status: {e}", exc_info=True)
         raise HTTPException(
@@ -114,18 +112,18 @@ async def get_task_status(task_id: str):
     try:
         service = HistoricalDataService()
         status = service.get_task_status(task_id)
-        
+
         if not status:
             raise HTTPException(
                 status_code=404,
                 detail=f"Task not found: {task_id}",
             )
-        
+
         return {
             "success": True,
             "data": status,
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -142,12 +140,12 @@ async def list_sync_history(limit: int = 10):
     try:
         service = HistoricalDataService()
         tasks = service.list_tasks(limit=limit)
-        
+
         return {
             "success": True,
             "data": tasks,
         }
-        
+
     except Exception as e:
         logger.error(f"Failed to list sync history: {e}", exc_info=True)
         raise HTTPException(
@@ -157,9 +155,9 @@ async def list_sync_history(limit: int = 10):
 
 
 class FactorComputeRequest(BaseModel):
-    start_date: Optional[str] = None
-    end_date: Optional[str] = None
-    stock_codes: Optional[list[str]] = None  # 指定股票，None 表示全市场
+    start_date: str | None = None
+    end_date: str | None = None
+    stock_codes: list[str] | None = None  # 指定股票，None 表示全市场
 
 
 @router.post("/factor-compute", summary="计算时序因子")
@@ -171,6 +169,7 @@ async def compute_factors(req: FactorComputeRequest):
     """
     try:
         from app.services.factor_compute_service import FactorComputeService
+
         service = FactorComputeService()
         result = service.compute_factors_for_all_stocks(
             start_date=req.start_date,

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 数据状态与同步 API 端点
 
@@ -10,9 +9,8 @@
 import logging
 import os
 from datetime import datetime, timedelta
-from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Query
 from pydantic import BaseModel
 
 from app.database import get_db
@@ -28,14 +26,14 @@ def _get_stock_repo() -> StockRepository:
 
 
 class SyncRequest(BaseModel):
-    trade_date: Optional[str] = None
-    stock_codes: Optional[list[str]] = None
+    trade_date: str | None = None
+    stock_codes: list[str] | None = None
 
 
 class SyncResponse(BaseModel):
     success: bool
     message: str
-    trade_date: Optional[str] = None
+    trade_date: str | None = None
     synced_count: int = 0
     failed_count: int = 0
     errors: list[str] = []
@@ -59,6 +57,7 @@ async def get_data_status():
     latest_kline_date = None
     with db.get_session() as session:
         from sqlmodel import select
+
         from app.models import Kline
 
         statement = select(Kline.trade_date).order_by(Kline.trade_date.desc()).limit(1)
@@ -68,6 +67,7 @@ async def get_data_status():
     latest_factor_date = None
     with db.get_session() as session:
         from sqlmodel import select
+
         from app.models import Factor
 
         statement = select(Factor.trade_date).order_by(Factor.trade_date.desc()).limit(1)
@@ -103,9 +103,9 @@ async def sync_data(req: SyncRequest):
                 f"{result.get('synced', 0)} 条K线, "
                 f"{result.get('factor_count', 0)} 条因子"
             ),
-            trade_date=result.get('trade_date'),
-            synced_count=result.get('synced', 0),
-            failed_count=result.get('failed', 0),
+            trade_date=result.get("trade_date"),
+            synced_count=result.get("synced", 0),
+            failed_count=result.get("failed", 0),
             errors=[],
         )
     except Exception as e:
@@ -119,8 +119,8 @@ async def sync_data(req: SyncRequest):
 
 @router.get("/trade-calendar", summary="获取交易日历")
 async def get_trade_calendar(
-    start_date: Optional[str] = Query(None, description="开始日期 YYYY-MM-DD"),
-    end_date: Optional[str] = Query(None, description="结束日期 YYYY-MM-DD"),
+    start_date: str | None = Query(None, description="开始日期 YYYY-MM-DD"),
+    end_date: str | None = Query(None, description="结束日期 YYYY-MM-DD"),
 ):
     """
     获取交易日历。

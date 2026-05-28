@@ -3,10 +3,7 @@ import { computed } from 'vue'
 import VChart from 'vue-echarts'
 import { use } from 'echarts/core'
 import { BarChart } from 'echarts/charts'
-import {
-  TooltipComponent,
-  GridComponent,
-} from 'echarts/components'
+import { TooltipComponent, GridComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 import { useChartTheme } from '../../composables/use-chart-theme'
 
@@ -19,8 +16,21 @@ const props = defineProps<{
 }>()
 
 const option = computed(() => {
-  const months = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月']
-  
+  const months = [
+    '1月',
+    '2月',
+    '3月',
+    '4月',
+    '5月',
+    '6月',
+    '7月',
+    '8月',
+    '9月',
+    '10月',
+    '11月',
+    '12月',
+  ]
+
   return {
     animation: true,
     animationDuration: 600,
@@ -71,7 +81,7 @@ const option = computed(() => {
 </script>
 
 <template>
-  <div class="w-full h-[400px]">
+  <div class="h-[400px] w-full">
     <VChart :option="option" autoresize />
   </div>
 </template>

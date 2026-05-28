@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 数据同步服务
 
@@ -6,15 +5,14 @@
 """
 
 import logging
-from typing import Optional
 from datetime import datetime
 
 import pandas as pd
 
-from app.database import get_db
-from app.repositories import StockRepository
-from app.models.kline import Kline
 from app.config import get_config
+from app.database import get_db
+from app.models.kline import Kline
+from app.repositories import StockRepository
 
 logger = logging.getLogger(__name__)
 
@@ -29,8 +27,8 @@ class DataSyncService:
 
     def sync_daily_data(
         self,
-        trade_date: Optional[str] = None,
-        stock_codes: Optional[list[str]] = None,
+        trade_date: str | None = None,
+        stock_codes: list[str] | None = None,
     ) -> dict:
         """
         同步日K线数据。
@@ -62,8 +60,7 @@ class DataSyncService:
             fetcher_manager = DataFetcherManager()
         except ImportError:
             logger.warning(
-                "data_provider.DataFetcherManager not available. "
-                "Data sync requires the data_provider module."
+                "data_provider.DataFetcherManager not available. Data sync requires the data_provider module."
             )
             return {
                 "synced": 0,
@@ -90,9 +87,7 @@ class DataSyncService:
             "failed": failed,
             "errors": errors[:20],  # Limit error list
         }
-        logger.info(
-            f"Sync completed: {synced} synced, {failed} failed for {trade_date}"
-        )
+        logger.info(f"Sync completed: {synced} synced, {failed} failed for {trade_date}")
         return summary
 
     def _sync_single_stock(self, fetcher_manager, ts_code: str, trade_date: str) -> bool:
@@ -123,7 +118,6 @@ class DataSyncService:
             )
 
             # Upsert
-            from sqlmodel import select
 
             with self.db.get_session() as session:
                 existing = session.get(Kline, (ts_code, trade_date))
@@ -171,7 +165,7 @@ class DataSyncService:
             return last_friday.strftime("%Y-%m-%d")
 
 
-def _safe_float(val) -> Optional[float]:
+def _safe_float(val) -> float | None:
     """安全转换为 float"""
     if val is None or (isinstance(val, float) and pd.isna(val)):
         return None
@@ -181,7 +175,7 @@ def _safe_float(val) -> Optional[float]:
         return None
 
 
-def _safe_int(val) -> Optional[int]:
+def _safe_int(val) -> int | None:
     """安全转换为 int"""
     if val is None or (isinstance(val, float) and pd.isna(val)):
         return None

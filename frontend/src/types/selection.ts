@@ -38,4 +38,14 @@ export interface SelectionRecord {
   status: string
   factor_snapshot: Record<string, number>
   created_at?: string | null
+
+  // 扩展字段 / Extended fields from API response
+  name?: string | null
+  industry?: string | null
+  close?: number | null
+  pct_change?: number | null
+  pe_ttm?: number | null
+  pb?: number | null
+  roe_ttm?: number | null
+  market_cap?: number | null
 }

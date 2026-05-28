@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 ===================================
 Logging Configuration Module
@@ -15,18 +14,16 @@ import sys
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from typing import List, Optional
-
 
 LOG_FORMAT = "%(asctime)s | %(levelname)-8s | %(pathname)s:%(lineno)d | %(message)s"
 LOG_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 _ALLOWED_LOG_LEVELS = {
-    'DEBUG': logging.DEBUG,
-    'INFO': logging.INFO,
-    'WARNING': logging.WARNING,
-    'ERROR': logging.ERROR,
-    'CRITICAL': logging.CRITICAL,
+    "DEBUG": logging.DEBUG,
+    "INFO": logging.INFO,
+    "WARNING": logging.WARNING,
+    "ERROR": logging.ERROR,
+    "CRITICAL": logging.CRITICAL,
 }
 
 
@@ -47,10 +44,10 @@ class RelativePathFormatter(logging.Formatter):
 
 # Default third-party loggers to quiet
 DEFAULT_QUIET_LOGGERS = [
-    'urllib3',
-    'sqlalchemy',
-    'google',
-    'httpx',
+    "urllib3",
+    "sqlalchemy",
+    "google",
+    "httpx",
 ]
 
 
@@ -58,8 +55,8 @@ def setup_logging(
     log_prefix: str = "app",
     log_dir: str = "./logs",
     debug: bool = False,
-    console_level: Optional[int] = None,
-    extra_quiet_loggers: Optional[List[str]] = None,
+    console_level: int | None = None,
+    extra_quiet_loggers: list[str] | None = None,
 ) -> None:
     """
     Initialize unified logging system.
@@ -86,7 +83,7 @@ def setup_logging(
     log_path.mkdir(parents=True, exist_ok=True)
 
     # Log file paths (by date)
-    today_str = datetime.now().strftime('%Y%m%d')
+    today_str = datetime.now().strftime("%Y%m%d")
     log_file = log_path / f"{log_prefix}_{today_str}.log"
 
     # Configure root logger
@@ -99,9 +96,7 @@ def setup_logging(
 
     # Create relative path Formatter
     project_root = Path.cwd()
-    rel_formatter = RelativePathFormatter(
-        LOG_FORMAT, LOG_DATE_FORMAT, relative_to=project_root
-    )
+    rel_formatter = RelativePathFormatter(LOG_FORMAT, LOG_DATE_FORMAT, relative_to=project_root)
 
     # Handler 1: Console output
     console_handler = logging.StreamHandler(sys.stdout)
@@ -114,7 +109,7 @@ def setup_logging(
         log_file,
         maxBytes=10 * 1024 * 1024,  # 10MB
         backupCount=5,
-        encoding='utf-8',
+        encoding="utf-8",
     )
     file_handler.setLevel(logging.INFO)
     file_handler.setFormatter(rel_formatter)

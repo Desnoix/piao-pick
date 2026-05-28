@@ -1,13 +1,11 @@
-# -*- coding: utf-8 -*-
 from pydantic import BaseModel
-from typing import Optional
 
 
 class StockInfoSchema(BaseModel):
     ts_code: str
-    name: Optional[str] = None
-    industry: Optional[str] = None
-    list_date: Optional[str] = None
+    name: str | None = None
+    industry: str | None = None
+    list_date: str | None = None
     is_st: bool = False
     is_suspended: bool = False
 
@@ -15,11 +13,11 @@ class StockInfoSchema(BaseModel):
 class KlineSchema(BaseModel):
     ts_code: str
     trade_date: str
-    open: Optional[float] = None
-    high: Optional[float] = None
-    low: Optional[float] = None
-    close: Optional[float] = None
-    volume: Optional[int] = None
-    amount: Optional[float] = None
-    close_adj: Optional[float] = None
-    pct_chg: Optional[float] = None
+    open: float | None = None
+    high: float | None = None
+    low: float | None = None
+    close: float | None = None
+    volume: int | None = None
+    amount: float | None = None
+    close_adj: float | None = None
+    pct_chg: float | None = None

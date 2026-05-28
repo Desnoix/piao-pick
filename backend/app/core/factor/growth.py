@@ -1,12 +1,12 @@
-# -*- coding: utf-8 -*-
 """
 成长因子
 
 - Rev_Growth_YoY: 营业收入同比增长率
 - Ear_Growth_YoY: 归母净利润同比增长率
 
-NOTE: 需要基本面数据 (当期/同期营收、净利润),
-当前为 stub 实现, 返回空 Series。后续从 AKShare 基本面数据填充。
+数据由 FundamentalSyncTask 同步到 factor_daily:
+- rev_growth_yoy: stock_yjbb_em 批量接口 (已激活)
+- ear_growth_yoy: stock_yjbb_em 批量接口 (已激活)
 """
 
 import pandas as pd

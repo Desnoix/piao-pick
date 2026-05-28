@@ -1,0 +1,177 @@
+# =============================================================================
+# Ruff: Linter + Formatter (replaces pylint, black, isort, pyupgrade)
+# =============================================================================
+
+[tool.ruff]
+# 与项目 Python 版本保持一致
+target-version = "py311"
+# 单行最大长度，与编辑器配置一致
+line-length = 120
+# 检查范围
+src = ["app", "data_provider", "scripts", "tests"]
+
+[tool.ruff.lint]
+# 选用的规则集
+# E: pycodestyle error
+# W: pycodestyle warning
+# F: pyflakes
+# I: isort (自动排序 import)
+# UP: pyupgrade (现代化 Python 语法)
+# B: flake8-bugbear (常见错误模式)
+# SIM: flake8-simplify (代码简化建议)
+select = ["E", "W", "F", "I", "UP", "B", "SIM"]
+
+# 需要豁免的规则（根据项目现有代码调整）
+ignore = [
+    "E501",   # 行长度已在 line-length 中统一控制
+    "B008",   # 允许函数参数中使用 Depends() 等 FastAPI 依赖注入
+    "SIM102", # 允许嵌套 if（部分场景可读性更好）
+    "UP007",  # 允许使用 Optional[X] 而非 X | None（向后兼容）
+    "B904",   # 允许 except 中 raise 不带 from（现有代码过多，逐步迁移）
+    "B905",   # 允许 zip() 不带 strict=（Python 3.10+ 特性，逐步迁移）
+    "SIM108", # 允许 if-else 块代替三元表达式（部分场景可读性更好）
+    "SIM105", # 允许 try-except-pass 代替 contextlib.suppress
+]
+
+# 修复模式：自动修哪些规则
+fixable = ["I", "UP", "F401"]   # 自动修复 import 排序、语法升级、未使用 import
+unfixable = []
+
+[tool.ruff.lint.per-file-ignores]
+# 测试文件不希望某些规则
+"tests/**/*.py" = [
+    "F811",  # 允许 pytest fixture 重复命名
+    "E402",  # 允许 test 文件中 import 不在文件顶部
+]
+# 脚本文件允许直接执行
+"scripts/**/*.py" = [
+    "E402",  # 脚本中可能需要 sys.path 操作后 import
+]
+
+[tool.ruff.lint.isort]
+# import 分组顺序
+known-first-party = ["app", "data_provider"]
+section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]
+
+# =============================================================================
+# mypy: Static Type Checker
+# =============================================================================
+
+[tool.mypy]
+# Python 版本
+python_version = "3.11"
+# 检查的目录
+files = ["app", "data_provider"]
+# 宽松模式：渐进式引入类型注解
+strict = false
+# 警告配置
+warn_unused_configs = true
+warn_return_any = false         # 避免大量现有代码报错
+warn_unused_ignores = true
+# 允许动态类型（现有代码较多 Any）
+disallow_any_generics = false
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+# 第三方库类型处理
+ignore_missing_imports = true   # 部分第三方库无 stub（akshare 等）
+# 输出格式
+show_error_codes = true
+
+# 针对特定模块忽略缺失类型存根
+[[tool.mypy.overrides]]
+module = ["akshare", "tushare", "exchange_calendars"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["statsmodels.*"]
+ignore_missing_imports = true
+
+# =============================================================================
+# pytest: Test Framework
+# =============================================================================
+
+[tool.pytest.ini_options]
+# 测试目录 — 仅扫描子目录, 跳过 tests/ 根下的旧脚本测试
+testpaths = ["tests/unit", "tests/integration", "tests/e2e"]
+# 旧脚本文件 (tests/test_e2e.py 等) 不应被自动收集
+collect_ignore_glob = [
+    "tests/test_*.py",
+]
+# 文件发现
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+# 最小 Python 版本
+minversion = "8.0"
+# 默认参数
+addopts = [
+    "-v",                        # verbose 输出
+    "--strict-markers",          # 严格模式：未定义的 marker 报错
+    "--tb=short",                # 精简 traceback
+    "-p", "no:cacheprovider",    # 禁用缓存插件
+]
+# 异步测试支持（FastAPI 异步路由测试可能需要）
+asyncio_mode = "auto"
+
+# 警告过滤
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::UserWarning",
+]
+
+# 自定义 markers（按需扩展）
+markers = [
+    "unit: 纯逻辑测试，无外部依赖",
+    "slow: 耗时较长的测试（使用 --skip-slow 跳过）",
+    "integration: 集成测试（需要数据库连接）",
+    "e2e: 端到端测试（需要外部数据源）",
+]
+
+# 覆盖率配置（使用 pytest-cov 插件）
+[tool.coverage.run]
+# 仅测量 app 包 (data_provider 为外部数据源, 不计入覆盖率)
+source = ["app"]
+omit = [
+    "tests/*",
+    "**/__init__.py",
+    "scripts/*",
+    "app/main.py",               # FastAPI 应用启动难以单元测试
+    "app/core/scheduler.py",
+    "app/logging_config.py",
+    "app/tasks/*",                # 后台监控任务, 依赖外部调度
+    # 重度 I/O 服务: 依赖外部 API / 网络, 测试需要大量 mock
+    "app/services/data_preparation.py",
+    "app/services/data_quality_service.py",
+    "app/services/data_service.py",
+    "app/services/factor_compute_service.py",
+    "app/services/fundamental_service.py",
+    "app/services/fundamental_sync_task.py",
+    "app/services/historical_data_service.py",
+    "app/services/overfit_service.py",
+    # 回测引擎及衍生模块: 需要完整的行情 + 因子数据集, 无法用轻量 fixture 覆盖
+    "app/core/backtest/engine.py",
+    "app/core/backtest/metrics.py",
+    "app/core/backtest/ic_analysis.py",
+    "app/services/backtest_service.py",
+    "app/services/icir_service.py",
+    # 策略执行器 + 加载器: 需要真实 YAML 文件 + 全市场因子快照
+    "app/core/strategy/executor.py",
+    "app/core/strategy/loader.py",
+    "app/core/pipeline.py",
+]
+
+[tool.coverage.report]
+# 显示缺失行的具体行号
+show_missing = true
+# 精度
+precision = 2
+# 排除特定代码行不计入覆盖率
+exclude_lines = [
+    "pragma: no cover",          # 显式排除标记
+    "def __repr__",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.",
+]
+# 覆盖率低于该值则 pytest 失败
+fail_under = 60

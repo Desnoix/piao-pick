@@ -1,21 +1,19 @@
-# -*- coding: utf-8 -*-
 from pydantic import BaseModel
-from typing import Optional
 
 
 class StockScoreSchema(BaseModel):
     rank: int
     ts_code: str
-    name: Optional[str] = None
-    industry: Optional[str] = None
+    name: str | None = None
+    industry: str | None = None
     composite_score: float
     status: str = "OK"
-    close: Optional[float] = None
-    pct_change: Optional[float] = None
-    pe_ttm: Optional[float] = None
-    pb: Optional[float] = None
-    roe_ttm: Optional[float] = None
-    market_cap: Optional[float] = None
+    close: float | None = None
+    pct_change: float | None = None
+    pe_ttm: float | None = None
+    pb: float | None = None
+    roe_ttm: float | None = None
+    market_cap: float | None = None
     factor_snapshot: dict[str, float] = {}
 
 

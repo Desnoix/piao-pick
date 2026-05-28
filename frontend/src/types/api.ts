@@ -33,3 +33,12 @@ export interface SyncResponse {
   failed_count: number
   errors: string[]
 }
+
+export interface DataHealthSummary {
+  kline_date: string | null
+  factor_date: string | null
+  kline_coverage_pct: number
+  factor_coverage_pct: number
+  is_stale: boolean
+  stale_days: number
+}

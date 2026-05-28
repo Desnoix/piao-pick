@@ -1,12 +1,12 @@
-# -*- coding: utf-8 -*-
 """
 质量因子
 
 - ROE_TTM: 净资产收益率 TTM = 归属净利润 TTM / 归属净资产
 - Gross_Margin: 毛利率 = (营业收入 - 营业成本) / 营业收入
 
-NOTE: 需要基本面数据 (净利润、净资产、营收、营业成本),
-当前为 stub 实现, 返回空 Series。后续从 AKShare 基本面数据填充。
+数据由 FundamentalSyncTask 同步到 factor_daily:
+- roe_ttm: stock_yjbb_em 批量接口 (已激活)
+- gross_margin: stock_financial_analysis_indicator 单股接口 (待激活)
 """
 
 import pandas as pd

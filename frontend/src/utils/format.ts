@@ -63,3 +63,33 @@ export function formatNumber(num: number | null | undefined, decimals = 2): stri
   if (num === null || num === undefined) return '-'
   return num.toFixed(decimals)
 }
+
+/**
+ * 格式化 Z-Score 值, 带正号前缀
+ * @example formatZScore(1.85) => "+1.85"
+ * @example formatZScore(-0.32) => "-0.32"
+ */
+export function formatZScore(z: number | null | undefined): string {
+  if (z === null || z === undefined) return '-'
+  const sign = z > 0 ? '+' : ''
+  return `${sign}${z.toFixed(2)}`
+}
+
+/**
+ * Z-Score 颜色: >0.5 红(涨), <-0.5 绿(跌), 其余无色
+ */
+export function getZScoreColor(z: number | null | undefined): string {
+  if (z === null || z === undefined) return ''
+  if (z > 0.5) return 'text-up'
+  if (z < -0.5) return 'text-down'
+  return ''
+}
+
+/**
+ * Z-Score → 百分位 (用于可视化组件)
+ * 近似: P ≈ 50 + 50·tanh(0.7988·z)
+ * @example zScoreToPercentile(0) => 50, (1) => ~76, (2) => ~92
+ */
+export function zScoreToPercentile(z: number): number {
+  return Math.round(50 + 50 * Math.tanh(0.7988 * z))
+}

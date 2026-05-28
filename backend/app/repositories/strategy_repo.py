@@ -1,20 +1,19 @@
-# -*- coding: utf-8 -*-
 from sqlmodel import select
-from app.models import Strategy
-from typing import List, Optional
+
 from app.database import DatabaseManager
+from app.models import Strategy
 
 
 class StrategyRepository:
     def __init__(self, db: DatabaseManager):
         self.db = db
 
-    def get_all(self) -> List[Strategy]:
+    def get_all(self) -> list[Strategy]:
         with self.db.get_session() as session:
             statement = select(Strategy).order_by(Strategy.priority)
             return list(session.exec(statement).all())
 
-    def get_active(self) -> List[Strategy]:
+    def get_active(self) -> list[Strategy]:
         with self.db.get_session() as session:
             statement = (
                 select(Strategy)
@@ -23,11 +22,11 @@ class StrategyRepository:
             )
             return list(session.exec(statement).all())
 
-    def get_by_id(self, strategy_id: str) -> Optional[Strategy]:
+    def get_by_id(self, strategy_id: str) -> Strategy | None:
         with self.db.get_session() as session:
             return session.get(Strategy, strategy_id)
 
-    def get_by_name(self, name: str) -> Optional[Strategy]:
+    def get_by_name(self, name: str) -> Strategy | None:
         with self.db.get_session() as session:
             statement = select(Strategy).where(Strategy.name == name)
             return session.exec(statement).first()

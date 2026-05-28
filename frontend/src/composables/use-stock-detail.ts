@@ -76,7 +76,7 @@ export function useStockDetail(tsCode: Ref<string>): StockDetailResult {
         const snapshot: Record<string, number> = {}
         for (const [key, val] of Object.entries(latest)) {
           if (key !== 'ts_code' && key !== 'trade_date' && typeof val === 'number') {
-            snapshot[key] = Math.min(100, Math.max(0, val ?? 0))
+            snapshot[key] = val ?? 0 // Z-Score, 不做 clamp
           }
         }
         factorSnapshot.value = snapshot
@@ -108,9 +108,13 @@ export function useStockDetail(tsCode: Ref<string>): StockDetailResult {
     }
   }
 
-  watch(tsCode, () => {
-    loadData()
-  }, { immediate: true })
+  watch(
+    tsCode,
+    () => {
+      loadData()
+    },
+    { immediate: true }
+  )
 
   return {
     stockInfo,

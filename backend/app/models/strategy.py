@@ -1,18 +1,16 @@
-# -*- coding: utf-8 -*-
-from sqlmodel import SQLModel, Field
-from typing import Optional
+from sqlmodel import Field, SQLModel
 
 
 class Strategy(SQLModel, table=True):
     __tablename__ = "strategies"
 
     id: str = Field(primary_key=True)  # UUID
-    name: Optional[str] = None
-    display_name: Optional[str] = None
-    description: Optional[str] = None
-    category: Optional[str] = None  # 'value'/'momentum'/'blended'
+    name: str | None = None
+    display_name: str | None = None
+    description: str | None = None
+    category: str | None = None  # 'value'/'momentum'/'blended'
     config: str = Field()  # YAML string
     is_active: bool = Field(default=True)
     priority: int = Field(default=50)
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
+    created_at: str | None = None
+    updated_at: str | None = None

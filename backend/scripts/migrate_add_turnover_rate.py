@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Migration: Add turnover_rate column to kline_daily table
 
@@ -11,8 +10,8 @@ Migration: Add turnover_rate column to kline_daily table
     python scripts/migrate_add_turnover_rate.py
 """
 
-import sys
 import logging
+import sys
 from pathlib import Path
 
 _backend_dir = Path(__file__).resolve().parent.parent
@@ -28,14 +27,17 @@ def main():
     logger = logging.getLogger("migrate_turnover_rate")
 
     from app.config import get_config
+
     config = get_config()
     logger.info(f"DB path: {config.db_path}")
 
     from app.database import get_db
+
     db = get_db()
 
     # Check if column exists
     from sqlalchemy import inspect, text
+
     with db.get_session() as session:
         inspector = inspect(session.bind)
         table = "kline_daily"
@@ -47,9 +49,7 @@ def main():
             return
 
         logger.info("Adding turnover_rate column...")
-        session.execute(text(
-            "ALTER TABLE kline_daily ADD COLUMN turnover_rate REAL"
-        ))
+        session.execute(text("ALTER TABLE kline_daily ADD COLUMN turnover_rate REAL"))
         session.commit()
         logger.info("✓ turnover_rate column added successfully")
 

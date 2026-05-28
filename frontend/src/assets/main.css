@@ -1,45 +1,45 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 @theme {
-  --font-sans: "Geist Sans", "PingFang SC", "Microsoft YaHei", sans-serif;
-  --font-mono: "Geist Mono", monospace;
+  --font-sans: 'Geist Sans', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-mono: 'Geist Mono', monospace;
 
   /* Dark-tech semantic tokens (dark mode default - Bloomberg/TradingView palette) */
-  --color-surface: #0A0E17;
+  --color-surface: #0a0e17;
   --color-surface-elevated: #111827;
-  --color-surface-inset: #1E293B;
-  --color-border: #1E293B;
+  --color-surface-inset: #1e293b;
+  --color-border: #1e293b;
   --color-border-muted: #334155;
-  --color-text-primary: #F1F5F9;
-  --color-text-secondary: #94A3B8;
-  --color-text-muted: #64748B;
+  --color-text-primary: #f1f5f9;
+  --color-text-secondary: #94a3b8;
+  --color-text-muted: #64748b;
 
   /* Brand: cyan accent for quant/tech feel */
-  --color-accent: #06B6D4;
-  --color-accent-hover: #22D3EE;
+  --color-accent: #06b6d4;
+  --color-accent-hover: #22d3ee;
   --color-accent-muted: rgba(6, 182, 212, 0.12);
 
   /* Primary blue (keep) */
-  --color-primary: #3B82F6;
-  --color-primary-hover: #2563EB;
+  --color-primary: #3b82f6;
+  --color-primary-hover: #2563eb;
 
   /* A-share: RED = UP, GREEN = DOWN */
-  --color-up: #EF4444;
-  --color-down: #22C55E;
+  --color-up: #ef4444;
+  --color-down: #22c55e;
   --color-up-bg: rgba(239, 68, 68, 0.12);
   --color-down-bg: rgba(34, 197, 94, 0.12);
 
   /* Surface hierarchy - deeper depth levels */
-  --color-surface-sunken: #070B12;
+  --color-surface-sunken: #070b12;
 
   /* Glass panel premium treatment */
   --color-glass-border: rgba(255, 255, 255, 0.06);
   --color-glass-highlight: rgba(255, 255, 255, 0.03);
 
   /* Status colors */
-  --color-warning: #F59E0B;
-  --color-error: #EF4444;
-  --color-success: #22C55E;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
+  --color-success: #22c55e;
 }
 
 /* Dark mode variant for TailwindCSS dark: utilities */
@@ -47,38 +47,38 @@
 
 /* :root defaults = dark mode (dark-first design) */
 :root {
-  --color-surface: #0A0E17;
+  --color-surface: #0a0e17;
   --color-surface-elevated: #111827;
-  --color-surface-inset: #1E293B;
-  --color-border: #1E293B;
+  --color-surface-inset: #1e293b;
+  --color-border: #1e293b;
   --color-border-muted: #334155;
-  --color-text-primary: #F1F5F9;
-  --color-text-secondary: #94A3B8;
-  --color-text-muted: #64748B;
-  --color-accent: #06B6D4;
-  --color-accent-hover: #22D3EE;
+  --color-text-primary: #f1f5f9;
+  --color-text-secondary: #94a3b8;
+  --color-text-muted: #64748b;
+  --color-accent: #06b6d4;
+  --color-accent-hover: #22d3ee;
   --color-accent-muted: rgba(6, 182, 212, 0.12);
-  --color-surface-sunken: #070B12;
+  --color-surface-sunken: #070b12;
   --color-glass-border: rgba(255, 255, 255, 0.06);
   --color-glass-highlight: rgba(255, 255, 255, 0.03);
 }
 
 /* Light mode activated by removing .dark class */
 html:not(.dark) {
-  --color-surface: #F8FAFC;
-  --color-surface-elevated: #FFFFFF;
-  --color-surface-inset: #F1F5F9;
-  --color-border: #E2E8F0;
-  --color-border-muted: #CBD5E1;
-  --color-text-primary: #0F172A;
+  --color-surface: #f8fafc;
+  --color-surface-elevated: #ffffff;
+  --color-surface-inset: #f1f5f9;
+  --color-border: #e2e8f0;
+  --color-border-muted: #cbd5e1;
+  --color-text-primary: #0f172a;
   --color-text-secondary: #475569;
-  --color-text-muted: #94A3B8;
-  --color-accent: #0891B2;
-  --color-accent-hover: #06B6D4;
+  --color-text-muted: #94a3b8;
+  --color-accent: #0891b2;
+  --color-accent-hover: #06b6d4;
   --color-accent-muted: rgba(8, 145, 178, 0.08);
-  --color-up-bg: #FEF2F2;
-  --color-down-bg: #F0FDF4;
-  --color-surface-sunken: #F1F5F9;
+  --color-up-bg: #fef2f2;
+  --color-down-bg: #f0fdf4;
+  --color-surface-sunken: #f1f5f9;
   --color-glass-border: rgba(0, 0, 0, 0.06);
   --color-glass-highlight: rgba(255, 255, 255, 0.6);
 }
@@ -93,7 +93,9 @@ body {
   font-family: var(--font-sans);
   background-color: var(--color-surface);
   color: var(--color-text-primary);
-  transition: background-color 0.2s, color 0.2s;
+  transition:
+    background-color 0.2s,
+    color 0.2s;
 }
 
 .font-mono {
@@ -153,12 +155,15 @@ body {
 }
 
 /* Display text: tighter letter-spacing for weight + presence */
-h1, h2, h3 {
+h1,
+h2,
+h3 {
   letter-spacing: -0.02em;
 }
 
 /* Prevent orphan words in headings */
-h1, h2 {
+h1,
+h2 {
   text-wrap: balance;
 }
 
@@ -166,7 +171,7 @@ h1, h2 {
 
 /* Visible focus ring for keyboard navigation (a11y requirement) */
 :focus-visible {
-  outline: 2px solid var(--color-accent, #06B6D4);
+  outline: 2px solid var(--color-accent, #06b6d4);
   outline-offset: 2px;
 }
 
@@ -179,12 +184,14 @@ h1, h2 {
 
 /* Tactile press feedback on buttons */
 button:not(:disabled),
-[role="button"]:not([aria-disabled="true"]) {
-  transition: transform 0.08s ease, background-color 0.15s ease;
+[role='button']:not([aria-disabled='true']) {
+  transition:
+    transform 0.08s ease,
+    background-color 0.15s ease;
 }
 
 button:active:not(:disabled),
-[role="button"]:active:not([aria-disabled="true"]) {
+[role='button']:active:not([aria-disabled='true']) {
   transform: scale(0.98);
 }
 
@@ -244,5 +251,39 @@ button:active:not(:disabled),
 .data-mono {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-  font-feature-settings: "tnum";
+  font-feature-settings: 'tnum';
+}
+
+/* ===== Touch optimization (global) ===== */
+@media (hover: none) {
+  /* Disable sticky hover on touch devices */
+  button:hover,
+  [role='button']:hover {
+    background-color: inherit;
+    color: inherit;
+  }
+
+  /* Keep press feedback */
+  button:active,
+  [role='button']:active {
+    opacity: 0.8;
+  }
+
+  /* Larger touch targets for links in text */
+  a:not(.n-button) {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+}
+
+/* ===== Skeleton transitions ===== */
+/* Smooth fade between skeleton and real content */
+.skeleton-enter-active,
+.skeleton-leave-active {
+  transition: opacity 0.25s ease;
+}
+.skeleton-enter-from,
+.skeleton-leave-to {
+  opacity: 0;
 }

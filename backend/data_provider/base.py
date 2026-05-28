@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 ===================================
 Data Provider Base & Manager
@@ -20,25 +19,25 @@ import time
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
 from threading import RLock
-from typing import Dict, List, Optional, Tuple
 
-import numpy as np
 import pandas as pd
 
 logger = logging.getLogger(__name__)
 
 
 # === Standard column definitions ===
-STANDARD_COLUMNS = ['date', 'open', 'high', 'low', 'close', 'volume', 'amount', 'pct_chg']
+STANDARD_COLUMNS = ["date", "open", "high", "low", "close", "volume", "amount", "pct_chg"]
 
 
 class DataFetchError(Exception):
     """Data fetch base exception."""
+
     pass
 
 
 class RateLimitError(DataFetchError):
     """API rate limit exception."""
+
     pass
 
 
@@ -57,7 +56,7 @@ def unwrap_exception(exc: Exception) -> Exception:
     return current
 
 
-def summarize_exception(exc: Exception) -> Tuple[str, str]:
+def summarize_exception(exc: Exception) -> tuple[str, str]:
     """Build a stable summary for logs while preserving the application-layer message."""
     root = unwrap_exception(exc)
     error_type = type(root).__name__
@@ -86,21 +85,21 @@ def normalize_stock_code(stock_code: str) -> str:
     upper = code.upper()
 
     # Strip SH/SZ prefix (e.g. SH600519 -> 600519)
-    if upper.startswith(('SH', 'SZ')) and not upper.startswith('SH.') and not upper.startswith('SZ.'):
+    if upper.startswith(("SH", "SZ")) and not upper.startswith("SH.") and not upper.startswith("SZ."):
         candidate = code[2:]
         if candidate.isdigit() and len(candidate) in (5, 6):
             return candidate
 
     # Strip BJ prefix (e.g. BJ920748 -> 920748)
-    if upper.startswith('BJ') and not upper.startswith('BJ.'):
+    if upper.startswith("BJ") and not upper.startswith("BJ."):
         candidate = code[2:]
         if candidate.isdigit() and len(candidate) == 6:
             return candidate
 
     # Strip .SH/.SZ/.BJ suffix (e.g. 600519.SH -> 600519, 920748.BJ -> 920748)
-    if '.' in code:
-        base, suffix = code.rsplit('.', 1)
-        if suffix.upper() in ('SH', 'SZ', 'SS', 'BJ') and base.isdigit():
+    if "." in code:
+        base, suffix = code.rsplit(".", 1)
+        if suffix.upper() in ("SH", "SZ", "SS", "BJ") and base.isdigit():
             return base
 
     return code
@@ -127,11 +126,7 @@ ETF_PREFIXES = ("51", "52", "56", "58", "15", "16", "18")
 def _is_etf_code(code: str) -> bool:
     """Check if the code is an A-share ETF fund code."""
     normalized = normalize_stock_code(code)
-    return (
-        normalized.isdigit()
-        and len(normalized) == 6
-        and normalized.startswith(ETF_PREFIXES)
-    )
+    return normalized.isdigit() and len(normalized) == 6 and normalized.startswith(ETF_PREFIXES)
 
 
 def is_bse_code(code: str) -> bool:
@@ -162,7 +157,7 @@ def is_st_stock(name: str) -> bool:
     ST stocks have special trading rules and typically +/-5% limit.
     """
     n = (name or "").upper()
-    return 'ST' in n
+    return "ST" in n
 
 
 def is_kc_cy_stock(code: str) -> bool:
@@ -219,11 +214,40 @@ class BaseFetcher(ABC):
         """
         pass
 
+    def get_index_daily_data(self, index_code: str, start_date: str, end_date: str) -> pd.DataFrame:
+        """
+        Get index daily historical data (subclass should override).
+
+        Default implementation raises DataFetchError — only fetchers that
+        support index data need to implement this.
+
+        Args:
+            index_code: Index code, e.g. '000300' (沪深300)
+            start_date: Start date in 'YYYY-MM-DD' or 'YYYYMMDD' format
+            end_date: End date in 'YYYY-MM-DD' or 'YYYYMMDD' format
+
+        Returns:
+            DataFrame with columns: 日期, 开盘, 收盘, 最高, 最低, 成交量, 成交额, ...
+        """
+        raise DataFetchError(f"[{self.name}] Index daily data not supported")
+
+    def get_index_spot_data(self) -> pd.DataFrame:
+        """
+        Get all index real-time spot data (subclass should override).
+
+        Default implementation raises DataFetchError — only fetchers that
+        support index spot data need to implement this.
+
+        Returns:
+            DataFrame with columns: 代码, 名称, 最新价, 涨跌幅, 成交量, 成交额, ...
+        """
+        raise DataFetchError(f"[{self.name}] Index spot data not supported")
+
     def get_daily_data(
         self,
         stock_code: str,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
         days: int = 30,
     ) -> pd.DataFrame:
         """
@@ -246,12 +270,12 @@ class BaseFetcher(ABC):
         """
         # Calculate date range
         if end_date is None:
-            end_date = datetime.now().strftime('%Y-%m-%d')
+            end_date = datetime.now().strftime("%Y-%m-%d")
 
         if start_date is None:
             # Default: get recent trading days (estimate by calendar days, fetch extra)
-            start_dt = datetime.strptime(end_date, '%Y-%m-%d') - timedelta(days=days * 2)
-            start_date = start_dt.strftime('%Y-%m-%d')
+            start_dt = datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=days * 2)
+            start_date = start_dt.strftime("%Y-%m-%d")
 
         request_start = time.time()
         logger.info(f"[{self.name}] Fetching {stock_code} daily data: range={start_date} ~ {end_date}")
@@ -299,20 +323,20 @@ class BaseFetcher(ABC):
         df = df.copy()
 
         # Ensure date column is datetime type
-        if 'date' in df.columns:
-            df['date'] = pd.to_datetime(df['date'])
+        if "date" in df.columns:
+            df["date"] = pd.to_datetime(df["date"])
 
         # Numeric column type conversion
-        numeric_cols = ['open', 'high', 'low', 'close', 'volume', 'amount', 'pct_chg']
+        numeric_cols = ["open", "high", "low", "close", "volume", "amount", "pct_chg"]
         for col in numeric_cols:
             if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors='coerce')
+                df[col] = pd.to_numeric(df[col], errors="coerce")
 
         # Remove rows with missing key columns
-        df = df.dropna(subset=['close', 'volume'])
+        df = df.dropna(subset=["close", "volume"])
 
         # Sort by date ascending
-        df = df.sort_values('date', ascending=True).reset_index(drop=True)
+        df = df.sort_values("date", ascending=True).reset_index(drop=True)
 
         return df
 
@@ -325,17 +349,17 @@ class BaseFetcher(ABC):
         df = df.copy()
 
         # Moving averages
-        df['ma5'] = df['close'].rolling(window=5, min_periods=1).mean()
-        df['ma10'] = df['close'].rolling(window=10, min_periods=1).mean()
-        df['ma20'] = df['close'].rolling(window=20, min_periods=1).mean()
+        df["ma5"] = df["close"].rolling(window=5, min_periods=1).mean()
+        df["ma10"] = df["close"].rolling(window=10, min_periods=1).mean()
+        df["ma20"] = df["close"].rolling(window=20, min_periods=1).mean()
 
         # Volume ratio: daily volume / 5-day average volume
-        avg_volume_5 = df['volume'].rolling(window=5, min_periods=1).mean()
-        df['volume_ratio'] = df['volume'] / avg_volume_5.shift(1)
-        df['volume_ratio'] = df['volume_ratio'].fillna(1.0)
+        avg_volume_5 = df["volume"].rolling(window=5, min_periods=1).mean()
+        df["volume_ratio"] = df["volume"] / avg_volume_5.shift(1)
+        df["volume_ratio"] = df["volume_ratio"].fillna(1.0)
 
         # Round to 2 decimal places
-        for col in ['ma5', 'ma10', 'ma20', 'volume_ratio']:
+        for col in ["ma5", "ma10", "ma20", "volume_ratio"]:
             if col in df.columns:
                 df[col] = df[col].round(2)
 
@@ -367,18 +391,18 @@ class DataFetcherManager:
     - Raise exception when all sources fail
     """
 
-    def __init__(self, fetchers: Optional[List[BaseFetcher]] = None):
+    def __init__(self, fetchers: list[BaseFetcher] | None = None):
         """
         Initialize manager.
 
         Args:
             fetchers: List of data sources (optional, auto-creates defaults by priority)
         """
-        self._fetchers: List[BaseFetcher] = []
+        self._fetchers: list[BaseFetcher] = []
         self._fetchers_lock = RLock()
-        self._fetcher_call_locks: Dict[int, RLock] = {}
+        self._fetcher_call_locks: dict[int, RLock] = {}
         self._fetcher_call_locks_lock = RLock()
-        self._stock_name_cache: Dict[str, str] = {}
+        self._stock_name_cache: dict[str, str] = {}
         self._stock_name_cache_lock = RLock()
 
         if fetchers:
@@ -401,7 +425,7 @@ class DataFetcherManager:
         if not hasattr(self, "_stock_name_cache_lock") or self._stock_name_cache_lock is None:
             self._stock_name_cache_lock = RLock()
 
-    def _get_fetchers_snapshot(self) -> List[BaseFetcher]:
+    def _get_fetchers_snapshot(self) -> list[BaseFetcher]:
         self._ensure_concurrency_guards()
         with self._fetchers_lock:
             return list(getattr(self, "_fetchers", []))
@@ -422,12 +446,12 @@ class DataFetcherManager:
         with self._get_fetcher_call_lock(fetcher):
             return method(*args, **kwargs)
 
-    def _get_cached_stock_name(self, stock_code: str) -> Optional[str]:
+    def _get_cached_stock_name(self, stock_code: str) -> str | None:
         self._ensure_concurrency_guards()
         with self._stock_name_cache_lock:
             return self._stock_name_cache.get(stock_code)
 
-    def _cache_stock_name(self, stock_code: str, name: Optional[str]) -> Optional[str]:
+    def _cache_stock_name(self, stock_code: str, name: str | None) -> str | None:
         if name is None:
             return None
         self._ensure_concurrency_guards()
@@ -454,9 +478,7 @@ class DataFetcherManager:
             self._fetchers = [akshare, tushare]
             self._fetchers.sort(key=lambda f: f.priority)
 
-        priority_info = ", ".join(
-            [f"{f.name}(P{f.priority})" for f in self._get_fetchers_snapshot()]
-        )
+        priority_info = ", ".join([f"{f.name}(P{f.priority})" for f in self._get_fetchers_snapshot()])
         logger.info(f"Initialized {len(self._fetchers)} data sources (by priority): {priority_info}")
 
     def add_fetcher(self, fetcher: BaseFetcher) -> None:
@@ -469,10 +491,10 @@ class DataFetcherManager:
     def get_daily_data(
         self,
         stock_code: str,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
         days: int = 30,
-    ) -> Tuple[pd.DataFrame, str]:
+    ) -> tuple[pd.DataFrame, str]:
         """
         Get daily data with automatic failover.
 
@@ -504,7 +526,9 @@ class DataFetcherManager:
 
         for attempt, fetcher in enumerate(fetchers, start=1):
             try:
-                logger.info(f"[Data source attempt {attempt}/{total_fetchers}] [{fetcher.name}] fetching {stock_code}...")
+                logger.info(
+                    f"[Data source attempt {attempt}/{total_fetchers}] [{fetcher.name}] fetching {stock_code}..."
+                )
                 df = self._call_fetcher_method(
                     fetcher,
                     "get_daily_data",
@@ -541,7 +565,121 @@ class DataFetcherManager:
         logger.error(f"[Data source terminated] {stock_code} failed: elapsed={elapsed:.2f}s\n{error_summary}")
         raise DataFetchError(error_summary)
 
+    def get_index_daily_data(
+        self,
+        index_code: str,
+        start_date: str,
+        end_date: str,
+    ) -> tuple[pd.DataFrame, str]:
+        """
+        Get index daily data with automatic failover.
+
+        Failover strategy:
+        1. Start from highest priority data source
+        2. On exception, automatically switch to next
+        3. Raise DataFetchError when all sources fail
+
+        Args:
+            index_code: Index code, e.g. '000300'
+            start_date: Start date
+            end_date: End date
+
+        Returns:
+            Tuple[DataFrame, str]: (data, successful source name)
+
+        Raises:
+            DataFetchError: When all sources fail
+        """
+        fetchers = self._get_fetchers_snapshot()
+        errors = []
+        total_fetchers = len(fetchers)
+        request_start = time.time()
+
+        for attempt, fetcher in enumerate(fetchers, start=1):
+            try:
+                logger.info(
+                    f"[Index data attempt {attempt}/{total_fetchers}] [{fetcher.name}] fetching {index_code}..."
+                )
+                df = self._call_fetcher_method(
+                    fetcher,
+                    "get_index_daily_data",
+                    index_code=index_code,
+                    start_date=start_date,
+                    end_date=end_date,
+                )
+
+                if df is not None and not df.empty:
+                    elapsed = time.time() - request_start
+                    logger.info(
+                        f"[Index data complete] {index_code} using [{fetcher.name}] success: "
+                        f"rows={len(df)}, elapsed={elapsed:.2f}s"
+                    )
+                    return df, fetcher.name
+
+            except Exception as e:
+                error_type, error_reason = summarize_exception(e)
+                error_msg = f"[{fetcher.name}] ({error_type}) {error_reason}"
+                logger.warning(
+                    f"[Index data failed {attempt}/{total_fetchers}] [{fetcher.name}] {index_code}: "
+                    f"error_type={error_type}, reason={error_reason}"
+                )
+                errors.append(error_msg)
+                if attempt < total_fetchers:
+                    next_fetcher = fetchers[attempt]
+                    logger.info(f"[Index data switch] {index_code}: [{fetcher.name}] -> [{next_fetcher.name}]")
+                continue
+
+        error_summary = f"All data sources failed for index {index_code}:\n" + "\n".join(errors)
+        elapsed = time.time() - request_start
+        logger.error(f"[Index data terminated] {index_code} failed: elapsed={elapsed:.2f}s\n{error_summary}")
+        raise DataFetchError(error_summary)
+
+    def get_index_spot_data(self) -> tuple[pd.DataFrame, str]:
+        """
+        Get all index real-time spot data with automatic failover.
+
+        Returns:
+            Tuple[DataFrame, str]: (data, successful source name)
+
+        Raises:
+            DataFetchError: When all sources fail
+        """
+        fetchers = self._get_fetchers_snapshot()
+        errors = []
+        total_fetchers = len(fetchers)
+        request_start = time.time()
+
+        for attempt, fetcher in enumerate(fetchers, start=1):
+            try:
+                logger.info(
+                    f"[Index spot attempt {attempt}/{total_fetchers}] [{fetcher.name}]..."
+                )
+                df = self._call_fetcher_method(fetcher, "get_index_spot_data")
+
+                if df is not None and not df.empty:
+                    elapsed = time.time() - request_start
+                    logger.info(
+                        f"[Index spot complete] [{fetcher.name}] success: "
+                        f"rows={len(df)}, elapsed={elapsed:.2f}s"
+                    )
+                    return df, fetcher.name
+
+            except Exception as e:
+                error_type, error_reason = summarize_exception(e)
+                error_msg = f"[{fetcher.name}] ({error_type}) {error_reason}"
+                logger.warning(
+                    f"[Index spot failed {attempt}/{total_fetchers}] [{fetcher.name}]: "
+                    f"error_type={error_type}, reason={error_reason}"
+                )
+                errors.append(error_msg)
+                continue
+
+        error_summary = "All data sources failed for index spot data:\n" + "\n".join(errors)
+        elapsed = time.time() - request_start
+        logger.error(f"[Index spot terminated] failed: elapsed={elapsed:.2f}s\n{error_summary}")
+        raise DataFetchError(error_summary)
+
     @property
-    def available_fetchers(self) -> List[str]:
+    def available_fetchers(self) -> list[str]:
         """Return list of available data source names."""
         return [f.name for f in self._get_fetchers_snapshot()]

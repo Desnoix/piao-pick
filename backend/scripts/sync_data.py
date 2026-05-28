@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 手动数据同步脚本
 
@@ -11,9 +10,9 @@
     python scripts/sync_data.py --codes 000001.SZ,600519.SH  # 同步指定股票
 """
 
-import sys
 import argparse
 import logging
+import sys
 from pathlib import Path
 
 # 确保项目根目录在 sys.path 中
@@ -25,9 +24,7 @@ if str(_backend_dir) not in sys.path:
 def main():
     parser = argparse.ArgumentParser(description="手动数据同步")
     parser.add_argument("--date", type=str, default=None, help="交易日期 YYYY-MM-DD")
-    parser.add_argument(
-        "--codes", type=str, default=None, help="股票代码列表，逗号分隔"
-    )
+    parser.add_argument("--codes", type=str, default=None, help="股票代码列表，逗号分隔")
     parser.add_argument("--verbose", "-v", action="store_true", help="详细输出")
     args = parser.parse_args()
 

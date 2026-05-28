@@ -3,16 +3,21 @@
  * Stock detail page: K-line, factor radar, factor metrics, financial trend, factor history.
  * 个股详情页: K线、因子雷达、因子评分、财务趋势、因子历史。
  */
-import { computed, toRef } from 'vue'
-import { NSpin, NAlert, NTag, NButton } from 'naive-ui'
+import { computed, toRef, ref, nextTick, onMounted } from 'vue'
+import { NAlert, NTag, NButton, NSkeleton } from 'naive-ui'
+import * as echarts from 'echarts/core'
 import StockHeader from '../components/common/StockHeader.vue'
 import KLineChart from '../components/charts/KLineChart.vue'
 import FactorRadar from '../components/charts/FactorRadar.vue'
 import FactorHistory from '../components/charts/FactorHistory.vue'
 import FinancialTrend from '../components/FinancialTrend.vue'
+import ChartSkeleton from '../components/skeleton/ChartSkeleton.vue'
+import DetailSkeleton from '../components/skeleton/DetailSkeleton.vue'
 import { useStockDetail } from '../composables/use-stock-detail'
 import { useChartTheme } from '../composables/use-chart-theme'
 import { FACTOR_LABELS, FACTOR_CATEGORIES } from '../utils/constants'
+import { zScoreToPercentile } from '../utils/format'
+import { aggregateKlines, type KlinePeriod } from '../utils/kline-aggregate'
 import { PhHouse, PhArrowLeft } from '@phosphor-icons/vue'
 
 const props = defineProps<{
@@ -34,17 +39,37 @@ const {
 
 const { theme } = useChartTheme()
 
+// 周期切换 Period switching
+const period = ref<KlinePeriod>('daily')
+const displayKlines = computed(() => aggregateKlines(klines.value, period.value))
+
+// 十字光标联动 Crosshair linking
+const klineChartRef = ref()
+const factorHistoryRef = ref()
+
+onMounted(() => {
+  nextTick(() => {
+    const klineInstance = klineChartRef.value?.chart
+    const factorInstance = factorHistoryRef.value?.chart
+    if (klineInstance && factorInstance) {
+      echarts.connect([klineInstance, factorInstance])
+    }
+  })
+})
+
 /** Sorted factor entries grouped by category */
 const factorEntries = computed(() => {
   const snapshot = factorSnapshot.value
-  const entries: { key: string; label: string; value: number; category: string }[] = []
+  const entries: { key: string; label: string; value: number; zScore: number; category: string }[] =
+    []
   for (const [cat, keys] of Object.entries(FACTOR_CATEGORIES)) {
     for (const key of keys) {
       if (key in snapshot) {
         entries.push({
           key,
           label: FACTOR_LABELS[key] || key,
-          value: Math.round(snapshot[key]),
+          value: zScoreToPercentile(snapshot[key]), // 百分位, 用于柱宽
+          zScore: snapshot[key], // 原始 Z-Score, 用于显示
           category: cat,
         })
       }
@@ -73,12 +98,12 @@ const lastKline = computed(() => {
 </script>
 
 <template>
-  <NSpin :show="loading" class="min-h-[60vh]">
+  <div>
     <!-- Back navigation -->
     <router-link
       v-if="stockInfo"
       to="/selection"
-      class="inline-flex items-center gap-1.5 text-[13px] text-[var(--color-text-muted)] hover:text-[var(--color-accent)] transition-colors mb-2"
+      class="mb-2 inline-flex items-center gap-1.5 text-[13px] text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-accent)]"
     >
       <PhArrowLeft :size="14" />
       <span>返回选股</span>
@@ -93,6 +118,39 @@ const lastKline = computed(() => {
       </div>
     </div>
 
+    <!-- Loading: skeleton layout -->
+    <div v-if="loading && !stockInfo" class="flex flex-col gap-8">
+      <!-- StockHeader skeleton -->
+      <div class="flex items-center gap-3">
+        <NSkeleton circle width="40px" height="40px" :sharp="false" />
+        <div class="flex flex-col gap-2">
+          <NSkeleton width="120px" height="20px" :sharp="false" />
+          <NSkeleton width="80px" height="14px" :sharp="false" />
+        </div>
+      </div>
+
+      <!-- K-line + Factor sidebar skeleton -->
+      <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div class="lg:col-span-2">
+          <ChartSkeleton height="320px" />
+        </div>
+        <div class="flex flex-col gap-6">
+          <div class="glass-panel p-5">
+            <ChartSkeleton height="200px" />
+          </div>
+          <div class="glass-panel p-5">
+            <DetailSkeleton :rows="12" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Lower charts skeleton -->
+      <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <ChartSkeleton height="240px" />
+        <ChartSkeleton height="240px" />
+      </div>
+    </div>
+
     <div v-if="stockInfo" class="flex flex-col gap-8">
       <!-- Stock Header -->
       <StockHeader
@@ -104,15 +162,37 @@ const lastKline = computed(() => {
       />
 
       <!-- Main Grid: K-line (2/3) + Factor sidebar (1/3) -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <!-- K-line Chart -->
-        <div class="lg:col-span-2 flex flex-col gap-2.5">
+        <div class="flex flex-col gap-2.5 lg:col-span-2">
           <div class="flex items-center justify-between px-1">
             <span class="section-label">价格走势</span>
-            <span v-if="mockKline" class="mock-tag">示例数据</span>
+            <div class="flex items-center gap-3">
+              <!-- 周期切换 Period switch -->
+              <div class="flex items-center gap-0.5">
+                <button
+                  v-for="p in [
+                    { label: '日K', value: 'daily' },
+                    { label: '周K', value: 'weekly' },
+                    { label: '月K', value: 'monthly' },
+                  ]"
+                  :key="p.value"
+                  :class="[
+                    'rounded px-2 py-0.5 text-[11px] transition-colors',
+                    period === p.value
+                      ? 'bg-[var(--color-accent)] text-white'
+                      : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]',
+                  ]"
+                  @click="period = p.value as KlinePeriod"
+                >
+                  {{ p.label }}
+                </button>
+              </div>
+              <span v-if="mockKline" class="mock-tag">示例数据</span>
+            </div>
           </div>
           <div class="glass-panel p-5">
-            <KLineChart :data="klines" />
+            <KLineChart ref="klineChartRef" :data="displayKlines" />
           </div>
         </div>
 
@@ -135,13 +215,13 @@ const lastKline = computed(() => {
             <div class="glass-panel p-5">
               <div
                 v-if="factorEntries.length === 0"
-                class="text-sm text-[var(--color-text-muted)] py-6 text-center"
+                class="py-6 text-center text-sm text-[var(--color-text-muted)]"
               >
                 暂无因子数据
               </div>
               <div v-else class="flex flex-col">
                 <template v-for="cat in Object.keys(FACTOR_CATEGORIES)" :key="cat">
-                  <div class="flex items-center gap-2 mt-3 mb-2 first:mt-0">
+                  <div class="mt-3 mb-2 flex items-center gap-2 first:mt-0">
                     <span class="category-badge">
                       {{ categoryLabels[cat] || cat }}
                     </span>
@@ -160,8 +240,11 @@ const lastKline = computed(() => {
                         :style="[getBarStyle(entry.value), { width: `${entry.value}%` }]"
                       />
                     </div>
-                    <span class="factor-value">
-                      {{ entry.value }}
+                    <span
+                      class="factor-value"
+                      :title="`Z-Score: ${entry.zScore > 0 ? '+' : ''}${entry.zScore.toFixed(2)}σ`"
+                    >
+                      P{{ entry.value }}
                     </span>
                   </div>
                 </template>
@@ -172,7 +255,7 @@ const lastKline = computed(() => {
       </div>
 
       <!-- Lower Grid: Financial Trend + Factor History -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div class="flex flex-col gap-2.5">
           <div class="flex items-center justify-between px-1">
             <span class="section-label">财务趋势</span>
@@ -195,6 +278,7 @@ const lastKline = computed(() => {
           </div>
           <div class="glass-panel p-5">
             <FactorHistory
+              ref="factorHistoryRef"
               :dates="factorHistory.dates"
               :factors="factorHistory.factors"
             />
@@ -211,14 +295,10 @@ const lastKline = computed(() => {
       <div class="empty-icon-ring">
         <PhArrowLeft :size="22" class="text-[var(--color-text-muted)]" />
       </div>
-      <div class="text-sm text-[var(--color-text-secondary)] mb-1">
-        未找到股票数据
-      </div>
-      <div class="text-xs text-[var(--color-text-muted)]">
-        请检查股票代码是否正确
-      </div>
+      <div class="mb-1 text-sm text-[var(--color-text-secondary)]">未找到股票数据</div>
+      <div class="text-xs text-[var(--color-text-muted)]">请检查股票代码是否正确</div>
     </div>
-  </NSpin>
+  </div>
 </template>
 
 <style scoped>

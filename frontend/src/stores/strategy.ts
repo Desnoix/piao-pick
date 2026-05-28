@@ -1,7 +1,11 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { Strategy } from '../types/strategy'
-import { listStrategies, deleteStrategy as apiDeleteStrategy, updateStrategy as apiUpdateStrategy } from '../api/strategies'
+import {
+  listStrategies,
+  deleteStrategy as apiDeleteStrategy,
+  updateStrategy as apiUpdateStrategy,
+} from '../api/strategies'
 
 export const useStrategyStore = defineStore('strategy', () => {
   const strategies = ref<Strategy[]>([])
@@ -9,10 +13,14 @@ export const useStrategyStore = defineStore('strategy', () => {
 
   const activeStrategies = computed(() => strategies.value.filter((s) => s.is_active))
 
-  async function fetchStrategies() {
+  async function fetchStrategies(options?: { silent?: boolean }) {
     loading.value = true
     try {
-      strategies.value = await listStrategies()
+      strategies.value = await listStrategies(options)
+    } catch (err: any) {
+      // 忽略请求取消错误（来自 client.ts 的请求去重机制）
+      if (err?.code === 'ERR_CANCELED' || err?.name === 'CanceledError') return
+      throw err // 重新抛出非取消错误，让调用方处理
     } finally {
       loading.value = false
     }

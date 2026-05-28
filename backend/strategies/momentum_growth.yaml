@@ -5,9 +5,16 @@ name: momentum_growth
 display_name: 动量成长
 description: 强势动量 + 高成长 + 资金流入，适合进取型投资者
 category: momentum
-version: "1.0"
+version: "1.1"
 default_active: true
 default_priority: 20
+
+# 因子合成配置
+composite:
+  method: icir              # fixed | icir | equal
+  icir_lookback: 12         # ICIR 滚动窗口月数 (仅 method=icir 时生效)
+  icir_min_periods: 6       # 最少有效 IC 期数, 低于此则用 YAML 固定权重兜底
+  max_single_weight: 0.40   # 单因子最大权重 (防过度集中)
 
 # 股票池过滤规则
 universe:
@@ -45,12 +52,25 @@ factors:
     weight: 0.10
     direction: negative             # 偏好中盘
 
+# 中性化配置
+neutralization:
+  enabled: true                    # 是否启用中性化
+  dimensions:                      # 中性化维度
+    - industry                     # 申万一级行业 (stock_info.industry)
+    - market_cap                   # 对数市值 (ln_market_cap 因子)
+
 # 过滤器
 filters:
   - type: percentile_top
     count: 80                       # 先取前 80 名
   - type: industry_diversify
     max_per_industry: 8             # 每行业最多 8 只（允许集中）
+
+# 因子管线配置 (不配置时默认: method=mad, n=5.0)
+factor_pipeline:
+  winsorize_method: mad
+  winsorize_n_mad: 5.0
+  winsorize_limits_sigma: [-3.0, 3.0]
 
 # 输出配置
 output:

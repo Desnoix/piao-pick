@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 因子模块
 
@@ -6,14 +5,16 @@
 ALL_FACTORS 字典将因子名称映射到对应的计算函数。
 """
 
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from .base import FactorPipeline
-from .value import compute_pe_ttm, compute_pb, compute_ps_ttm, compute_fcf_yield
+from .growth import compute_ear_growth_yoy, compute_rev_growth_yoy
 from .momentum import compute_ret_20d, compute_ret_60d_vol, compute_turnover_20d
-from .quality import compute_roe_ttm, compute_gross_margin
-from .growth import compute_rev_growth_yoy, compute_ear_growth_yoy
+from .neutralize import neutralize
+from .quality import compute_gross_margin, compute_roe_ttm
 from .size import compute_ln_market_cap
+from .value import compute_fcf_yield, compute_pb, compute_pe_ttm, compute_ps_ttm
 
 ALL_FACTORS: dict[str, Callable[..., Any]] = {
     # 估值因子
@@ -38,6 +39,7 @@ ALL_FACTORS: dict[str, Callable[..., Any]] = {
 __all__ = [
     "FactorPipeline",
     "ALL_FACTORS",
+    "neutralize",
     "compute_pe_ttm",
     "compute_pb",
     "compute_ps_ttm",

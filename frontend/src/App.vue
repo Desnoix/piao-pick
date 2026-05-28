@@ -6,7 +6,7 @@ import {
   NNotificationProvider,
   NLoadingBarProvider,
 } from 'naive-ui'
-import { computed, onMounted, type Component, markRaw } from 'vue'
+import { computed, onMounted, ref, watch, type Component, markRaw } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAppStore } from './stores/app'
 import {
@@ -18,6 +18,7 @@ import {
   PhGearSix,
   PhSun,
   PhMoon,
+  PhList,
 } from '@phosphor-icons/vue'
 
 const router = useRouter()
@@ -99,6 +100,16 @@ const pageTitle = computed(() => {
   return ''
 })
 
+const mobileMenuOpen = ref(false)
+
+// Auto-close drawer on route change
+watch(
+  () => route.path,
+  () => {
+    mobileMenuOpen.value = false
+  }
+)
+
 onMounted(() => {
   appStore.initTheme()
 })
@@ -111,16 +122,15 @@ onMounted(() => {
       <NDialogProvider>
         <NNotificationProvider>
           <NLoadingBarProvider>
+            <!-- Mobile backdrop overlay -->
+            <div v-if="mobileMenuOpen" class="mobile-backdrop" @click="mobileMenuOpen = false" />
+
             <div class="app-shell">
-              <!-- Icon Rail -->
-              <aside class="rail" aria-label="主导航">
+              <!-- Icon Rail / Mobile Drawer -->
+              <aside class="rail" :class="{ 'rail--open': mobileMenuOpen }" aria-label="主导航">
                 <!-- Brand -->
                 <div class="rail__brand">
-                  <PhChartLineUp
-                    :size="22"
-                    weight="bold"
-                    class="rail__brand-icon"
-                  />
+                  <PhChartLineUp :size="22" weight="bold" class="rail__brand-icon" />
                   <span class="rail__brand-text">飘票选股</span>
                 </div>
 
@@ -147,8 +157,8 @@ onMounted(() => {
 
               <!-- Main area -->
               <div class="main-area">
-                <!-- Header -->
-                <header class="app-header">
+                <!-- Desktop header -->
+                <header class="app-header app-header--desktop">
                   <h1 class="app-header__title">{{ pageTitle }}</h1>
 
                   <!-- Right: status + theme + avatar -->
@@ -172,6 +182,26 @@ onMounted(() => {
                     <!-- User avatar placeholder -->
                     <div class="user-avatar" aria-label="用户">QP</div>
                   </div>
+                </header>
+
+                <!-- Mobile header (hamburger + title + theme) -->
+                <header class="mobile-header">
+                  <button
+                    class="mobile-menu-btn"
+                    aria-label="打开菜单"
+                    @click="mobileMenuOpen = !mobileMenuOpen"
+                  >
+                    <PhList :size="22" weight="bold" />
+                  </button>
+                  <h1 class="mobile-header__title">{{ pageTitle }}</h1>
+                  <button
+                    class="mobile-theme-btn"
+                    :aria-label="appStore.isDark ? '切换到浅色模式' : '切换到深色模式'"
+                    @click="appStore.toggleTheme"
+                  >
+                    <PhMoon v-if="!appStore.isDark" :size="18" weight="regular" />
+                    <PhSun v-else :size="18" weight="regular" />
+                  </button>
                 </header>
 
                 <!-- Content -->
@@ -229,7 +259,8 @@ onMounted(() => {
   width: 60px;
   background: var(--color-surface-elevated);
   border-right: 1px solid var(--color-glass-border, var(--color-border));
-  transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+  transition:
+    width 0.3s cubic-bezier(0.16, 1, 0.3, 1),
     box-shadow 0.3s ease;
   z-index: 0;
 }
@@ -299,7 +330,8 @@ onMounted(() => {
   font-family: inherit;
   font-size: 13px;
   text-align: left;
-  transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+  transition:
+    width 0.3s cubic-bezier(0.16, 1, 0.3, 1),
     background-color 0.15s ease,
     color 0.15s ease;
 }
@@ -367,7 +399,7 @@ onMounted(() => {
   overflow: hidden;
 }
 
-/* ========== Header ========== */
+/* ========== Desktop Header ========== */
 .app-header {
   height: 52px;
   min-height: 52px;
@@ -406,7 +438,9 @@ onMounted(() => {
   background: transparent;
   color: var(--color-text-secondary);
   cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
   flex-shrink: 0;
 }
 
@@ -452,6 +486,64 @@ onMounted(() => {
   font-family: var(--font-mono);
 }
 
+/* ========== Mobile Header ========== */
+.mobile-header {
+  display: none;
+}
+
+.mobile-menu-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background-color 0.15s ease;
+}
+
+.mobile-menu-btn:hover {
+  background: var(--color-surface-inset);
+}
+
+.mobile-menu-btn:active {
+  background: var(--color-surface-inset);
+}
+
+.mobile-header__title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0;
+  line-height: 1;
+  flex: 1;
+  text-align: center;
+}
+
+.mobile-theme-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background-color 0.15s ease;
+}
+
+.mobile-theme-btn:hover {
+  background: var(--color-surface-inset);
+  color: var(--color-text-primary);
+}
+
 /* ========== Content ========== */
 .content-area {
   flex: 1;
@@ -463,5 +555,158 @@ onMounted(() => {
 .content-inner {
   max-width: 1600px;
   min-height: calc(100dvh - 52px - 48px);
+}
+
+/* ============================================================
+   RESPONSIVE: Mobile & Tablet (< 1024px)
+   Rail becomes fixed overlay drawer, mobile header appears
+   ============================================================ */
+@media (max-width: 1023px) {
+  /* Rail: fixed drawer, hidden by default */
+  .rail {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100dvh;
+    min-width: unset;
+    width: 220px;
+    transform: translateX(-100%);
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    z-index: 60;
+    overflow: hidden;
+  }
+
+  .rail--open {
+    transform: translateX(0);
+    box-shadow: 8px 0 32px -8px rgba(0, 0, 0, 0.5);
+  }
+
+  /* Fixed backdrop always 220px (no hover expand) */
+  .rail::before {
+    width: 220px !important;
+    box-shadow: none !important;
+    transition: none !important;
+  }
+
+  .rail:hover::before {
+    width: 220px;
+    box-shadow: none;
+  }
+
+  /* Nav items: full width, labels always visible */
+  .rail__item {
+    width: 204px !important;
+    min-height: 44px;
+    transition:
+      background-color 0.15s ease,
+      color 0.15s ease;
+  }
+
+  .rail:hover .rail__item {
+    width: 204px;
+  }
+
+  .rail__item-label {
+    opacity: 1 !important;
+    transition: none;
+  }
+
+  .rail__item--active .rail__item-label {
+    font-weight: 600;
+  }
+
+  .rail__brand-text {
+    opacity: 1 !important;
+    transition: none;
+  }
+
+  /* Hide desktop header, show mobile header */
+  .app-header--desktop {
+    display: none;
+  }
+
+  .mobile-header {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    height: 56px;
+    min-height: 56px;
+    padding: 0 8px;
+    background: var(--color-surface-elevated);
+    border-bottom: 1px solid var(--color-border);
+    position: sticky;
+    top: 0;
+    z-index: 30;
+  }
+
+  /* Responsive content padding */
+  .content-area {
+    padding: 16px;
+  }
+}
+
+/* Tablet and above */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .content-area {
+    padding: 20px;
+  }
+}
+
+/* ============================================================
+   TOUCH OPTIMIZATION
+   Disable hover effects on touch devices to prevent sticky states
+   ============================================================ */
+@media (hover: none) {
+  .rail__item:hover,
+  .header-icon-btn:hover,
+  .mobile-menu-btn:hover,
+  .mobile-theme-btn:hover {
+    background: transparent;
+    color: inherit;
+  }
+
+  .rail__item--active:hover {
+    background: rgba(6, 182, 212, 0.08);
+  }
+
+  .rail__item:active,
+  .header-icon-btn:active,
+  .mobile-menu-btn:active,
+  .mobile-theme-btn:active {
+    background: var(--color-surface-inset);
+  }
+
+  /* Disable hover backdrop expand on touch devices (desktop rail) */
+  .rail:hover::before {
+    width: 60px;
+    box-shadow: none;
+  }
+
+  .rail:hover .rail__item {
+    width: 60px;
+  }
+
+  .rail:hover .rail__item-label,
+  .rail:hover .rail__brand-text {
+    opacity: 0;
+  }
+}
+
+/* ============================================================
+   MOBILE BACKDROP
+   ============================================================ */
+.mobile-backdrop {
+  display: none;
+}
+
+@media (max-width: 1023px) {
+  .mobile-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 55;
+    backdrop-filter: blur(2px);
+  }
 }
 </style>

@@ -1,10 +1,9 @@
-# -*- coding: utf-8 -*-
 from app.api.v1.schemas.common import (
-    HealthResponse,
-    ErrorResponse,
-    SuccessResponse,
-    PaginatedResponse,
     DataStatusResponse,
+    ErrorResponse,
+    HealthResponse,
+    PaginatedResponse,
+    SuccessResponse,
 )
 
 __all__ = [

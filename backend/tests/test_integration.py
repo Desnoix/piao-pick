@@ -1,8 +1,9 @@
-# -*- coding: utf-8 -*-
 """Phase 1 Integration Test"""
+
 import sys
-import os
-sys.path.insert(0, '.')
+
+sys.path.insert(0, ".")
+
 
 def test_imports():
     """Test all core module imports"""
@@ -58,7 +59,8 @@ def test_config():
     print("TEST 2: Config Loading")
     print("=" * 60)
 
-    from app.config import get_config, Config
+    from app.config import get_config
+
     config = get_config()
     print(f"  db_path: {config.db_path}")
     print(f"  schedule_enabled: {config.schedule_enabled}")
@@ -81,13 +83,14 @@ def test_database():
     print("=" * 60)
 
     from app.database import get_db
+
     db = get_db()
     print(f"  db_path: {db.db_path}")
 
     with db.get_session() as session:
-        from app.models import StockInfo, Kline, Factor, Strategy, SelectionResult
         # Check tables exist
         from sqlalchemy import inspect
+
         inspector = inspect(session.bind)
         tables = inspector.get_table_names()
         print(f"  Tables: {tables}")
@@ -101,8 +104,9 @@ def test_trading_calendar():
     print("TEST 4: Trading Calendar")
     print("=" * 60)
 
-    from app.core.trading_calendar import is_market_open, get_market_now
     from datetime import date
+
+    from app.core.trading_calendar import get_market_now, is_market_open
 
     now = get_market_now()
     print(f"  Market now: {now}")
@@ -120,8 +124,7 @@ def test_data_provider():
     print("TEST 5: Data Provider")
     print("=" * 60)
 
-    from data_provider import DataFetcherManager, normalize_stock_code, canonical_stock_code
-    from data_provider import is_st_stock, is_bse_code
+    from data_provider import DataFetcherManager, is_bse_code, is_st_stock, normalize_stock_code
 
     # Test code normalization
     tests = [
@@ -158,8 +161,9 @@ def test_fastapi():
     print("=" * 60)
 
     try:
-        from app.main import app
         from fastapi.testclient import TestClient
+
+        from app.main import app
 
         client = TestClient(app)
 
@@ -182,6 +186,7 @@ def test_fastapi():
     except Exception as e:
         print(f"  FAIL: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
@@ -211,10 +216,10 @@ def test_repositories():
     print("=" * 60)
 
     from app.database import get_db
-    from app.repositories.stock_repo import StockRepository
-    from app.repositories.strategy_repo import StrategyRepository
     from app.repositories.factor_repo import FactorRepository
     from app.repositories.selection_repo import SelectionRepository
+    from app.repositories.stock_repo import StockRepository
+    from app.repositories.strategy_repo import StrategyRepository
 
     db = get_db()
 
@@ -226,11 +231,11 @@ def test_repositories():
     strategies = strategy_repo.get_all()
     print(f"  StrategyRepository: {len(strategies)} strategies")
 
-    factor_repo = FactorRepository(db)
-    print(f"  FactorRepository: OK")
+    FactorRepository(db)
+    print("  FactorRepository: OK")
 
-    selection_repo = SelectionRepository(db)
-    print(f"  SelectionRepository: OK")
+    SelectionRepository(db)
+    print("  SelectionRepository: OK")
 
     return True
 
@@ -257,6 +262,7 @@ def main():
         except Exception as e:
             print(f"\n  EXCEPTION in {name}: {e}")
             import traceback
+
             traceback.print_exc()
             results[name] = False
 

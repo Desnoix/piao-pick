@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 股票相关 API 端点
 
@@ -9,13 +8,12 @@
 """
 
 import logging
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 
 from app.database import get_db
-from app.repositories import StockRepository, FactorRepository
-from app.schemas.stock import StockInfoSchema, KlineSchema
+from app.repositories import FactorRepository, StockRepository
+from app.schemas.stock import KlineSchema, StockInfoSchema
 
 logger = logging.getLogger(__name__)
 
@@ -34,27 +32,24 @@ def _get_factor_repo() -> FactorRepository:
 async def list_stocks(
     offset: int = Query(0, ge=0, description="偏移量"),
     limit: int = Query(50, ge=1, le=500, description="每页数量"),
-    keyword: Optional[str] = Query(None, description="关键词（代码或名称）"),
+    keyword: str | None = Query(None, description="关键词（代码或名称）"),
 ):
     """分页获取股票列表"""
     repo = _get_stock_repo()
     with repo.db.get_session() as session:
         from sqlmodel import select
+
         from app.models import StockInfo
 
         statement = select(StockInfo)
         if keyword:
-            statement = statement.where(
-                StockInfo.name.contains(keyword) | StockInfo.ts_code.contains(keyword)
-            )
+            statement = statement.where(StockInfo.name.contains(keyword) | StockInfo.ts_code.contains(keyword))
         # count
         from sqlmodel import func as sqlfunc
 
         count_stmt = select(sqlfunc.count()).select_from(StockInfo)
         if keyword:
-            count_stmt = count_stmt.where(
-                StockInfo.name.contains(keyword) | StockInfo.ts_code.contains(keyword)
-            )
+            count_stmt = count_stmt.where(StockInfo.name.contains(keyword) | StockInfo.ts_code.contains(keyword))
         total = session.exec(count_stmt).one()
 
         statement = statement.offset(offset).limit(limit)
@@ -81,8 +76,8 @@ async def get_stock(ts_code: str):
 @router.get("/{ts_code}/kline", summary="获取K线数据")
 async def get_kline(
     ts_code: str,
-    start_date: Optional[str] = Query(None, description="开始日期 YYYY-MM-DD"),
-    end_date: Optional[str] = Query(None, description="结束日期 YYYY-MM-DD"),
+    start_date: str | None = Query(None, description="开始日期 YYYY-MM-DD"),
+    end_date: str | None = Query(None, description="结束日期 YYYY-MM-DD"),
     limit: int = Query(500, ge=1, le=2000, description="最大返回条数"),
 ):
     """获取日K线数据"""
@@ -92,15 +87,11 @@ async def get_kline(
     else:
         # Use a wide range and limit via Kline query
         from sqlmodel import select
+
         from app.models import Kline
 
         with repo.db.get_session() as session:
-            statement = (
-                select(Kline)
-                .where(Kline.ts_code == ts_code)
-                .order_by(Kline.trade_date.desc())
-                .limit(limit)
-            )
+            statement = select(Kline).where(Kline.ts_code == ts_code).order_by(Kline.trade_date.desc()).limit(limit)
             klines = list(session.exec(statement).all())
         klines.reverse()
 
@@ -110,8 +101,8 @@ async def get_kline(
 @router.get("/{ts_code}/factors", summary="获取因子数据")
 async def get_factors(
     ts_code: str,
-    start_date: Optional[str] = Query(None, description="开始日期 YYYY-MM-DD"),
-    end_date: Optional[str] = Query(None, description="结束日期 YYYY-MM-DD"),
+    start_date: str | None = Query(None, description="开始日期 YYYY-MM-DD"),
+    end_date: str | None = Query(None, description="结束日期 YYYY-MM-DD"),
 ):
     """获取因子数据"""
     repo = _get_factor_repo()
@@ -121,14 +112,10 @@ async def get_factors(
         # Get latest 100 records
         with repo.db.get_session() as session:
             from sqlmodel import select
+
             from app.models import Factor
 
-            statement = (
-                select(Factor)
-                .where(Factor.ts_code == ts_code)
-                .order_by(Factor.trade_date.desc())
-                .limit(100)
-            )
+            statement = select(Factor).where(Factor.ts_code == ts_code).order_by(Factor.trade_date.desc()).limit(100)
             factors = list(session.exec(statement).all())
         factors.reverse()
 
